@@ -62,9 +62,14 @@ def health():
     return {"ok": True}
 
 
+
 if WEB_DIR.exists():
     app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
 
     @app.get("/")
     def index():
         return FileResponse(WEB_DIR / "index.html")
+
+    @app.get("/favicon.ico")
+    def favicon():
+        return FileResponse(WEB_DIR / "favicon.ico")

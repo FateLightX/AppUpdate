@@ -123,14 +123,28 @@ button, input, select, textarea { font: inherit; }
 .link-btn:hover { text-decoration: underline; }
 .link-btn.danger { color: #b91c1c; }
 
-.bars { display: flex; flex-direction: column; gap: 4px; }
-.mini {
-  display: grid; grid-template-columns: 36px 1fr; gap: 6px; align-items: center;
-  font-size: 11px; color: var(--muted);
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
-.bar { height: 5px; background: #f5f5f4; border-radius: 999px; overflow: hidden; }
-.bar > i { display: block; height: 100%; background: #22c55e; border-radius: 999px; }
-.bar.warn > i { background: #f59e0b; }
+.fact-main {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fact-main.warn { color: var(--danger); }
+.fact-sub {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .detail {
   margin-top: 14px;
@@ -143,6 +157,23 @@ button, input, select, textarea { font: inherit; }
   display: flex; justify-content: space-between; gap: 12px; align-items: flex-start;
   margin-bottom: 12px;
 }
+.detail-actions {
+  display: flex; align-items: center; gap: 10px; flex: none;
+}
+.icon-btn {
+  width: 32px; height: 32px;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.icon-btn:hover { color: var(--text); background: #fafaf9; }
 .detail h3 { margin: 0 0 4px; font-size: 16px; }
 .detail .url { color: var(--muted); font-size: 12px; word-break: break-all; }
 .kv {
@@ -274,14 +305,14 @@ button, input, select, textarea { font: inherit; }
     grid-template-areas:
       "dot name status"
       "dot type type"
-      "dot bars bars"
+      "dot facts facts"
       "dot actions actions";
   }
   .row.head { display: none; }
   .row > :nth-child(1) { grid-area: dot; }
   .row > :nth-child(2) { grid-area: name; }
   .row > :nth-child(3) { grid-area: type; }
-  .row > :nth-child(4) { grid-area: bars; }
+  .row > :nth-child(4) { grid-area: facts; }
   .row > :nth-child(5) { grid-area: status; justify-self: end; }
   .row > :nth-child(6) { grid-area: actions; }
   .field-row { grid-template-columns: 1fr; }

@@ -218,23 +218,40 @@ function renderFilters() {
     .join("");
 }
 
-function metricBars(item) {
+function metricFacts(item) {
   if (item.type === "github") {
-    const n = (item.assets || []).length;
-    const w = Math.min(100, 20 + n * 20);
-    const warn = item.hasUpdate || item.status === "update";
+    const matched = (item.assets || []).length;
+    const unmatched = (item.unmatchedAssets || []).length;
+    const total = matched + unmatched;
+    const version = item.version || "尚未检查";
+    const matchText =
+      total > 0
+        ? `匹配 ${matched}${total !== matched ? ` / ${total}` : ""} 个文件`
+        : matched > 0
+          ? `匹配 ${matched} 个文件`
+          : item.lastCheck
+            ? "无匹配文件"
+            : "等待检查";
     return `
-      <div class="bars">
-        <div class="mini"><span>版本</span><div class="bar ${warn ? "warn" : ""}"><i style="width:${warn ? 100 : 70}%"></i></div></div>
-        <div class="mini"><span>匹配</span><div class="bar"><i style="width:${w}%"></i></div></div>
+      <div class="facts">
+        <div class="fact-main ${item.hasUpdate || item.status === "update" ? "warn" : ""}">${escapeHtml(version)}</div>
+        <div class="fact-sub">${escapeHtml(matchText)}</div>
       </div>`;
   }
-  const n = (item.netdisks || []).length;
-  const warn = item.hasUpdate || item.status === "update";
+  const disks = item.netdisks || [];
+  const providers = [...new Set(disks.map((d) => d.provider).filter(Boolean))];
+  const title = item.title || item.version || "尚未检查";
+  const short =
+    title.length > 28 ? `${title.slice(0, 28)}…` : title;
+  const diskText = disks.length
+    ? `${disks.length} 个网盘${providers.length ? " · " + providers.slice(0, 3).join("/") : ""}`
+    : item.lastCheck
+      ? "未发现网盘"
+      : "等待检查";
   return `
-    <div class="bars">
-      <div class="mini"><span>标题</span><div class="bar ${warn ? "warn" : ""}"><i style="width:${warn ? 100 : 80}%"></i></div></div>
-      <div class="mini"><span>网盘</span><div class="bar"><i style="width:${Math.min(100, n * 30 || 15)}%"></i></div></div>
+    <div class="facts">
+      <div class="fact-main ${item.hasUpdate || item.status === "update" ? "warn" : ""}" title="${escapeHtml(title)}">${escapeHtml(short)}</div>
+      <div class="fact-sub">${escapeHtml(diskText)}</div>
     </div>`;
 }
 
@@ -258,10 +275,10 @@ function renderList() {
         <div><span class="${dotClass(item)}"></span></div>
         <div>
           <div class="name">${escapeHtml(item.name)}</div>
-          <div class="sub">${escapeHtml(item.summary || item.url)}</div>
+          <div class="sub">${escapeHtml(formatTime(item.lastCheck))} · ${escapeHtml(item.url)}</div>
         </div>
         <div><span class="tag">${item.type === "github" ? "GitHub" : "文章"}</span></div>
-        <div>${metricBars(item)}</div>
+        <div>${metricFacts(item)}</div>
         <div class="${statusClass(item)}">${statusLabel(item)}</div>
         <div class="row-actions" data-stop>
           <button type="button" class="link-btn" data-act="check" data-id="${item.id}">检查</button>
@@ -377,7 +394,10 @@ function renderDetail() {
         <h3>${escapeHtml(item.name)}</h3>
         <div class="url">${escapeHtml(item.url)}</div>
       </div>
-      <button type="button" class="switch ${item.enabled ? "on" : ""}" data-act="toggle" data-id="${item.id}" aria-label="启用停用"></button>
+      <div class="detail-actions">
+        <button type="button" class="switch ${item.enabled ? "on" : ""}" data-act="toggle" data-id="${item.id}" aria-label="启用停用"></button>
+        <button type="button" class="icon-btn" data-act="close-detail" aria-label="关闭详情">×</button>
+      </div>
     </div>
     <div class="kv">
       <span>类型</span><div>${item.type === "github" ? "GitHub" : "文章"}</div>
@@ -404,9 +424,9 @@ async function loadAll() {
   state.sources = sources;
   state.settings = settings;
   state.meta = meta;
-  if (state.selectedId == null && sources[0]) state.selectedId = sources[0].id;
+  // 不自动展开详情：只有用户点选时才显示
   if (state.selectedId != null && !sources.find((s) => s.id === state.selectedId)) {
-    state.selectedId = sources[0]?.id ?? null;
+    state.selectedId = null;
   }
   renderAll();
   renderAddChips();
@@ -754,7 +774,9 @@ function bindEvents() {
     if (stop) return;
     const row = e.target.closest(".row[data-id]");
     if (!row) return;
-    state.selectedId = Number(row.dataset.id);
+    const id = Number(row.dataset.id);
+    // 再点同一行则收起详情
+    state.selectedId = state.selectedId === id ? null : id;
     renderAll();
   });
 
@@ -765,10 +787,16 @@ function bindEvents() {
       return;
     }
     const act = e.target.closest("[data-act]");
-    if (act && act.dataset.act === "toggle") {
+    if (!act) return;
+    if (act.dataset.act === "close-detail") {
+      state.selectedId = null;
+      renderAll();
+      return;
+    }
+    if (act.dataset.act === "toggle") {
       toggleEnabled(Number(act.dataset.id));
     }
-    if (act && act.dataset.act === "edit-detail") {
+    if (act.dataset.act === "edit-detail") {
       openEdit(Number(act.dataset.id));
     }
   });
@@ -777,6 +805,14 @@ function bindEvents() {
     mask.addEventListener("click", (e) => {
       if (e.target === mask) mask.classList.remove("show");
     });
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (document.querySelector(".modal-mask.show, .login-gate:not([hidden])")) return;
+    if (state.selectedId == null) return;
+    state.selectedId = null;
+    renderAll();
   });
 }
 
