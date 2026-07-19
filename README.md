@@ -36,6 +36,41 @@ docker compose up -d --build
 docker compose down
 ```
 
+## GitHub Actions 镜像
+
+推送到 `main` 或打 `v*` 标签后，会自动构建并推送多架构镜像到 GHCR：
+
+- `ghcr.io/fatelightx/appupdate:latest`（main）
+- `ghcr.io/fatelightx/appupdate:sha-<短提交>`
+- `ghcr.io/fatelightx/appupdate:1.0.0`（标签 `v1.0.0`）
+
+### 使用预构建镜像
+
+```bash
+# 私有仓库镜像需先登录（用有 read:packages 的 Token）
+echo YOUR_GITHUB_TOKEN | docker login ghcr.io -u FateLightX --password-stdin
+
+docker pull ghcr.io/fatelightx/appupdate:latest
+
+docker run -d --name appupdate \
+  -p 8000:8000 \
+  -v "$PWD/data:/data" \
+  --restart unless-stopped \
+  ghcr.io/fatelightx/appupdate:latest
+```
+
+或在 `docker-compose.yml` 中注释 `build`，启用：
+
+```yaml
+image: ghcr.io/fatelightx/appupdate:latest
+```
+
+工作流文件：`.github/workflows/docker.yml`  
+也可在 GitHub → Actions → **Docker Image** → **Run workflow** 手动触发。
+
+若镜像拉不下来：到仓库 **Packages** 将 `appupdate` 包设为 Public，或保持 Private 并用 Token 登录。
+
+
 ## 可选环境变量
 
 | 变量 | 说明 |

@@ -1,6 +1,9 @@
 services:
   appupdate:
+    # 本地构建：
     build: .
+    # 或使用 GitHub Actions 推送的镜像（二选一，使用镜像时注释掉 build）：
+    # image: ghcr.io/fatelightx/appupdate:latest
     container_name: appupdate
     ports:
       - "8000:8000"
