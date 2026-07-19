@@ -270,6 +270,10 @@ function renderList() {
   $("rows").innerHTML = list
     .map((item) => {
       const active = item.id === state.selectedId ? "active" : "";
+      const detail =
+        item.id === state.selectedId
+          ? `<div class="row-detail" data-stop data-detail-id="${item.id}">${buildDetailHtml(item)}</div>`
+          : "";
       return `
       <div class="row ${active}" data-id="${item.id}">
         <div><span class="${dotClass(item)}"></span></div>
@@ -286,7 +290,7 @@ function renderList() {
           <button type="button" class="link-btn" data-act="toggle" data-id="${item.id}">${item.enabled ? "停用" : "启用"}</button>
           <button type="button" class="link-btn danger" data-act="del" data-id="${item.id}">删除</button>
         </div>
-      </div>`;
+      </div>${detail}`;
     })
     .join("");
 }
@@ -308,16 +312,7 @@ async function copyText(text) {
   }
 }
 
-function renderDetail() {
-  const el = $("detail");
-  const item = state.sources.find((s) => s.id === state.selectedId);
-  if (!item) {
-    el.hidden = true;
-    el.innerHTML = "";
-    return;
-  }
-  el.hidden = false;
-
+function buildDetailHtml(item) {
   let body = "";
   if (item.type === "github") {
     const assets = item.assets || [];
@@ -388,31 +383,36 @@ function renderDetail() {
     body += `<div class="section-label">最近错误</div><div class="status-err">${escapeHtml(item.lastError)}</div>`;
   }
 
-  el.innerHTML = `
-    <div class="detail-head">
-      <div>
-        <h3>${escapeHtml(item.name)}</h3>
-        <div class="url">${escapeHtml(item.url)}</div>
+  return `
+    <div class="detail">
+      <div class="detail-head">
+        <div>
+          <h3>${escapeHtml(item.name)}</h3>
+          <div class="url">${escapeHtml(item.url)}</div>
+        </div>
+        <div class="detail-actions">
+          <button type="button" class="switch ${item.enabled ? "on" : ""}" data-act="toggle" data-id="${item.id}" aria-label="启用停用"></button>
+          <button type="button" class="icon-btn" data-act="close-detail" aria-label="关闭详情">×</button>
+        </div>
       </div>
-      <div class="detail-actions">
-        <button type="button" class="switch ${item.enabled ? "on" : ""}" data-act="toggle" data-id="${item.id}" aria-label="启用停用"></button>
-        <button type="button" class="icon-btn" data-act="close-detail" aria-label="关闭详情">×</button>
+      <div class="kv">
+        <span>类型</span><div>${item.type === "github" ? "GitHub" : "文章"}</div>
+        <span>状态</span><div class="${statusClass(item)}">${statusLabel(item)}</div>
+        <span>上次检查</span><div>${escapeHtml(formatTime(item.lastCheck))}</div>
+        <span>Telegram</span><div>${state.settings?.telegramConfigured ? "有更新时推送" : "未配置"}</div>
       </div>
-    </div>
-    <div class="kv">
-      <span>类型</span><div>${item.type === "github" ? "GitHub" : "文章"}</div>
-      <span>状态</span><div class="${statusClass(item)}">${statusLabel(item)}</div>
-      <span>上次检查</span><div>${escapeHtml(formatTime(item.lastCheck))}</div>
-      <span>Telegram</span><div>${state.settings?.telegramConfigured ? "有更新时推送" : "未配置"}</div>
-    </div>
-    ${body}
-  `;
+      ${body}
+    </div>`;
+}
+
+function renderDetail() {
+  // 详情已并入列表行下方，保留此函数兼容旧调用
+  renderList();
 }
 
 function renderAll() {
   renderFilters();
   renderList();
-  renderDetail();
 }
 
 async function loadAll() {
@@ -759,18 +759,31 @@ function bindEvents() {
   });
 
   $("rows").addEventListener("click", (e) => {
-    const stop = e.target.closest("[data-stop]");
+    const copy = e.target.closest("[data-copy]");
+    if (copy) {
+      e.stopPropagation();
+      copyText(copy.getAttribute("data-copy"));
+      return;
+    }
     const actBtn = e.target.closest("[data-act]");
     if (actBtn) {
       e.stopPropagation();
       const id = Number(actBtn.dataset.id);
       const act = actBtn.dataset.act;
+      if (act === "close-detail") {
+        state.selectedId = null;
+        renderAll();
+        return;
+      }
       if (act === "check") checkNow(id);
-      if (act === "edit") openEdit(id);
+      if (act === "edit" || act === "edit-detail") openEdit(id);
       if (act === "toggle") toggleEnabled(id);
       if (act === "del") deleteSource(id);
       return;
     }
+    // 详情区域内的空白点击不切换行
+    if (e.target.closest(".row-detail")) return;
+    const stop = e.target.closest("[data-stop]");
     if (stop) return;
     const row = e.target.closest(".row[data-id]");
     if (!row) return;
@@ -778,26 +791,9 @@ function bindEvents() {
     // 再点同一行则收起详情
     state.selectedId = state.selectedId === id ? null : id;
     renderAll();
-  });
-
-  $("detail").addEventListener("click", (e) => {
-    const copy = e.target.closest("[data-copy]");
-    if (copy) {
-      copyText(copy.getAttribute("data-copy"));
-      return;
-    }
-    const act = e.target.closest("[data-act]");
-    if (!act) return;
-    if (act.dataset.act === "close-detail") {
-      state.selectedId = null;
-      renderAll();
-      return;
-    }
-    if (act.dataset.act === "toggle") {
-      toggleEnabled(Number(act.dataset.id));
-    }
-    if (act.dataset.act === "edit-detail") {
-      openEdit(Number(act.dataset.id));
+    if (state.selectedId != null) {
+      const panel = document.querySelector(`.row-detail[data-detail-id="${state.selectedId}"]`);
+      if (panel) panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   });
 

@@ -28,7 +28,7 @@ button, input, select, textarea { font: inherit; }
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 14px 20px;
   border-bottom: 1px solid var(--line);
@@ -70,7 +70,7 @@ button, input, select, textarea { font: inherit; }
 }
 .online.warn i { background: var(--amber); }
 
-.wrap { max-width: 1100px; margin: 0 auto; padding: 20px 20px 48px; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 20px 20px 48px; }
 .toolbar {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 12px; gap: 12px; flex-wrap: wrap;
@@ -87,10 +87,27 @@ button, input, select, textarea { font: inherit; }
 }
 .row {
   display: grid;
-  grid-template-columns: 16px 1.5fr 0.7fr 1.2fr 0.8fr 0.9fr;
-  gap: 10px; align-items: center;
-  padding: 14px 16px; border-bottom: 1px solid #f5f5f4;
+  /* 点 | 名称 | 类型 | 结果 | 状态 | 操作 —— 后三列不被挤压 */
+  grid-template-columns:
+    16px
+    minmax(120px, 1.1fr)
+    64px
+    minmax(200px, 1.9fr)
+    72px
+    max-content;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f5f5f4;
   cursor: pointer;
+}
+.row > :nth-child(2),
+.row > :nth-child(4) { min-width: 0; }
+.row > :nth-child(3),
+.row > :nth-child(5),
+.row > :nth-child(6) {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .row:last-child { border-bottom: 0; }
 .row:hover { background: #fcfcfc; }
@@ -106,7 +123,14 @@ button, input, select, textarea { font: inherit; }
 .dot.off { background: #d6d3d1; }
 .dot.err { background: #ef4444; }
 .name { font-weight: 650; }
-.sub { color: var(--muted); font-size: 12px; margin-top: 2px; word-break: break-all; }
+.sub {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .tag {
   display: inline-block; border: 1px solid var(--line); border-radius: 999px;
   padding: 2px 8px; font-size: 12px; color: var(--muted);
@@ -115,7 +139,13 @@ button, input, select, textarea { font: inherit; }
 .status-ok { color: var(--ok); font-size: 13px; }
 .status-off { color: var(--muted); font-size: 13px; }
 .status-err { color: #b91c1c; font-size: 13px; }
-.row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  justify-content: flex-end;
+}
 .link-btn {
   border: 0; background: transparent; color: var(--blue); cursor: pointer;
   padding: 0; font-size: 13px;
@@ -146,12 +176,28 @@ button, input, select, textarea { font: inherit; }
   text-overflow: ellipsis;
 }
 
+/* 详情嵌在对应行下方，不再固定在列表底部 */
+.row.active {
+  background: #fafaf9;
+  border-bottom-color: transparent;
+}
+.row-detail {
+  border-bottom: 1px solid var(--line);
+  background: #fafaf9;
+}
+.row-detail .detail {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 4px 16px 16px;
+}
 .detail {
-  margin-top: 14px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 16px;
+  margin-top: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
 }
 .detail-head {
   display: flex; justify-content: space-between; gap: 12px; align-items: flex-start;
@@ -315,6 +361,7 @@ button, input, select, textarea { font: inherit; }
   .row > :nth-child(4) { grid-area: facts; }
   .row > :nth-child(5) { grid-area: status; justify-self: end; }
   .row > :nth-child(6) { grid-area: actions; }
+  .row-actions { flex-wrap: wrap; justify-content: flex-start; }
   .field-row { grid-template-columns: 1fr; }
 }
 
