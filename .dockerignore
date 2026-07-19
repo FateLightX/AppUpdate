@@ -1,0 +1,13 @@
+.venv
+.venv313
+prototype
+design-options
+__pycache__
+**/__pycache__
+*.pyc
+.git
+data/*.db
+data/*.db-*
+web/fixtures
+docker-compose.verify.yml
+.DS_Store

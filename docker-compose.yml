@@ -1,0 +1,15 @@
+services:
+  appupdate:
+    build: .
+    container_name: appupdate
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    environment:
+      - APPUPDATE_DATA_DIR=/data
+      # 可选：提高 GitHub API 限额
+      # - GITHUB_TOKEN=ghp_xxx
+      # 可选：首次初始化时的面板密码（库里已有密码时不会覆盖）
+      # - APPUPDATE_PANEL_PASSWORD=your-password
+    restart: unless-stopped

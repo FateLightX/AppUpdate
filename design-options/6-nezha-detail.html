@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>方案 6 · 卡片+抽屉</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --card: #fff;
+    --text: #0c0a09;
+    --muted: #78716c;
+    --line: #e7e5e4;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --blue: #3b82f6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Inter, "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+  .top {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--bg);
+  }
+  .brand { font-weight: 700; font-size: 18px; }
+  .top-right { display: flex; gap: 8px; }
+  .pill {
+    border: 1px solid var(--line); background: #fff; border-radius: 999px;
+    height: 34px; padding: 0 12px; font: inherit; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .online i { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display:inline-block; }
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 14px;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 18px 20px 40px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+    align-content: start;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px;
+    cursor: pointer;
+  }
+  .card.active {
+    border-color: #a8a29e;
+    box-shadow: 0 0 0 1px #d6d3d1;
+  }
+  .card.up { border-color: #fcd34d; }
+  .head { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 10px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); margin-top: 4px; flex:none; }
+  .dot.warn { background: var(--amber); }
+  .name { font-weight: 650; }
+  .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .barline {
+    display: grid; grid-template-columns: 36px 1fr; gap: 8px; align-items: center;
+    margin-bottom: 6px; font-size: 12px; color: var(--muted);
+  }
+  .bar { height: 6px; background: #f5f5f4; border-radius: 999px; overflow: hidden; }
+  .bar > i { display:block; height:100%; background:#22c55e; border-radius:999px; }
+  .bar.warn > i { background:#f59e0b; }
+  .drawer {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+    position: sticky;
+    top: 18px;
+    height: fit-content;
+  }
+  .drawer h2 { margin: 0 0 4px; font-size: 18px; }
+  .drawer .url { color: var(--muted); font-size: 12px; word-break: break-all; margin-bottom: 14px; }
+  .kv { display: grid; grid-template-columns: 72px 1fr; gap: 8px 10px; margin-bottom: 14px; font-size: 13px; }
+  .kv span { color: var(--muted); }
+  .chip {
+    display: inline-block; background: #f5f5f4; border-radius: 999px;
+    padding: 4px 10px; font-size: 12px; margin: 0 6px 6px 0;
+  }
+  .asset {
+    display: flex; justify-content: space-between; gap: 10px; align-items: center;
+    padding: 10px 0; border-top: 1px solid #f5f5f4; font-size: 13px;
+  }
+  .asset code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .actions { display: flex; gap: 8px; margin-top: 14px; }
+  .actions button {
+    flex: 1; border: 1px solid var(--line); background: #fff; border-radius: 999px;
+    height: 36px; font: inherit; cursor: pointer;
+  }
+  .actions .primary { background: #0c0a09; color: #fff; border-color: #0c0a09; }
+  .banner {
+    position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+    background: #0c0a09; color: #fff; font-size: 12px;
+    padding: 7px 12px; border-radius: 999px; z-index: 20; opacity: .9;
+  }
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: 1fr; }
+    .drawer { position: static; }
+  }
+</style>
+</head>
+<body>
+  <div class="banner">方案 6 · 同风格卡片 + 右侧详情</div>
+  <header class="top">
+    <div class="brand">更新追踪</div>
+    <div class="top-right">
+      <button class="pill">添加</button>
+      <button class="pill">立即检查</button>
+      <div class="pill online"><i></i>12 启用</div>
+    </div>
+  </header>
+  <div class="layout">
+    <div class="grid">
+      <div class="card up active">
+        <div class="head">
+          <div class="dot warn"></div>
+          <div>
+            <div class="name">Clash Verge Rev</div>
+            <div class="sub">GitHub · 有更新</div>
+          </div>
+        </div>
+        <div class="barline"><span>版本</span><div class="bar warn"><i style="width:100%"></i></div></div>
+        <div class="barline"><span>匹配</span><div class="bar"><i style="width:80%"></i></div></div>
+      </div>
+      <div class="card up">
+        <div class="head">
+          <div class="dot warn"></div>
+          <div>
+            <div class="name">某资源站更新帖</div>
+            <div class="sub">文章 · 标题变化</div>
+          </div>
+        </div>
+        <div class="barline"><span>标题</span><div class="bar warn"><i style="width:100%"></i></div></div>
+        <div class="barline"><span>网盘</span><div class="bar"><i style="width:66%"></i></div></div>
+      </div>
+      <div class="card">
+        <div class="head">
+          <div class="dot"></div>
+          <div>
+            <div class="name">LocalSend</div>
+            <div class="sub">GitHub · 正常</div>
+          </div>
+        </div>
+        <div class="barline"><span>版本</span><div class="bar"><i style="width:70%"></i></div></div>
+        <div class="barline"><span>匹配</span><div class="bar"><i style="width:55%"></i></div></div>
+      </div>
+      <div class="card">
+        <div class="head">
+          <div class="dot"></div>
+          <div>
+            <div class="name">工具合集说明</div>
+            <div class="sub">文章 · 正常</div>
+          </div>
+        </div>
+        <div class="barline"><span>标题</span><div class="bar"><i style="width:100%"></i></div></div>
+        <div class="barline"><span>网盘</span><div class="bar"><i style="width:50%"></i></div></div>
+      </div>
+    </div>
+    <aside class="drawer">
+      <h2>Clash Verge Rev</h2>
+      <div class="url">https://github.com/clash-verge-rev/clash-verge-rev</div>
+      <div class="kv">
+        <span>最新版本</span><div>v2.4.1（正式版）</div>
+        <span>状态</span><div style="color:#b45309;font-weight:600">有更新</div>
+        <span>上次检查</span><div>10 分钟前</div>
+        <span>Telegram</span><div>已推送</div>
+      </div>
+      <div>
+        <span class="chip">扩展名 .dmg</span>
+        <span class="chip">系统 macOS</span>
+        <span class="chip">架构 arm64</span>
+      </div>
+      <div class="asset">
+        <code>Clash.Verge_2.4.1_aarch64.dmg</code>
+        <a href="#" style="color:var(--blue);text-decoration:none">复制</a>
+      </div>
+      <div class="asset">
+        <code>Clash.Verge_2.4.1_x64.dmg</code>
+        <a href="#" style="color:var(--blue);text-decoration:none">复制</a>
+      </div>
+      <div class="actions">
+        <button>检查此项</button>
+        <button class="primary">复制主链接</button>
+      </div>
+    </aside>
+  </div>
+</body>
+</html>

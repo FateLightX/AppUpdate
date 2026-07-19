@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>更新追踪</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand">更新追踪</div>
+    <div class="top-right">
+      <button class="pill" id="btnAdd" type="button">添加</button>
+      <button class="pill" id="btnCheck" type="button">立即检查</button>
+      <button class="pill" id="btnSettings" type="button">设置</button>
+      <button class="pill" id="btnLogout" type="button" hidden>退出</button>
+      <div class="pill online" id="onlineBadge"><i></i><span>0 启用</span></div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="toolbar">
+      <div class="filters" id="filters"></div>
+      <div class="sub" id="statsText">加载中…</div>
+    </div>
+
+    <section class="panel" id="listPanel">
+      <div class="row head">
+        <div></div>
+        <div>名称</div>
+        <div>类型</div>
+        <div>摘要</div>
+        <div>状态</div>
+        <div>操作</div>
+      </div>
+      <div id="rows"></div>
+    </section>
+
+    <section class="detail" id="detail" hidden></section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="login-gate" id="loginGate" hidden>
+    <div class="login-card">
+      <h2>需要访问密码</h2>
+      <p class="login-sub">面板已开启保护，输入密码后继续</p>
+      <div class="field">
+        <label>访问密码</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="请输入密码" />
+      </div>
+      <button type="button" class="pill primary login-btn" id="loginSubmit">进入</button>
+      <div class="login-error" id="loginError" hidden></div>
+    </div>
+  </div>
+
+
+  <div class="modal-mask" id="addModal">
+    <div class="modal">
+      <h3>添加追踪</h3>
+      <div class="type-tabs">
+        <button type="button" class="mini-chip on" data-type="github">GitHub</button>
+        <button type="button" class="mini-chip" data-type="article">文章</button>
+      </div>
+      <div class="field">
+        <label id="urlLabel">GitHub 仓库完整地址</label>
+        <input id="addUrl" placeholder="https://github.com/owner/repo" />
+      </div>
+      <div class="field">
+        <label>显示名称（可选）</label>
+        <input id="addName" placeholder="留空则自动生成" />
+      </div>
+      <div id="githubFields">
+        <div class="field">
+          <label>扩展名（可多选，不选=不限）</label>
+          <div class="chip-multi" id="extChips"></div>
+        </div>
+        <div class="field">
+          <label>系统（可多选，按别名识别）</label>
+          <div class="chip-multi" id="osChips"></div>
+          <div class="field-hint">
+            文件名别名自动认：macOS→darwin/osx；Windows→win/win64。文件名没写系统时，.dmg 仍算 macOS，.exe 算 Windows。
+          </div>
+        </div>
+        <div class="field">
+          <label>架构（可多选，按别名识别）</label>
+          <div class="chip-multi" id="archChips"></div>
+          <div class="field-hint">arm64 → aarch64；x64 → x86_64/amd64</div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>文件名包含（逗号分隔，全部满足）</label>
+            <input id="addInclude" placeholder="如 portable" />
+          </div>
+          <div class="field">
+            <label>文件名排除（逗号分隔，命中即丢）</label>
+            <input id="addExclude" placeholder="如 setup, debug" />
+          </div>
+        </div>
+        <div class="field">
+          <label><input type="checkbox" id="addPrerelease" checked /> 包含预发布</label>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="pill" id="addCancel">取消</button>
+        <button type="button" class="pill primary" id="addSubmit">保存并检查</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-mask" id="settingsModal">
+    <div class="modal">
+      <h3>设置</h3>
+      <div class="field">
+        <label>检查间隔（小时）</label>
+        <input id="setInterval" type="number" min="1" step="1" value="6" />
+      </div>
+      <div class="field">
+        <label>Telegram Bot Token</label>
+        <input id="setToken" type="password" placeholder="留空表示不修改" autocomplete="off" />
+        <div class="field-hint" id="tokenHint"></div>
+      </div>
+      <div class="field">
+        <label>Telegram Chat ID</label>
+        <input id="setChatId" placeholder="如 123456789" />
+      </div>
+      <div class="field">
+        <label>面板访问密码（可选）</label>
+        <input id="setPanelPassword" type="password" placeholder="留空表示不修改" autocomplete="new-password" />
+        <div class="field-hint" id="panelPasswordHint">未设置时任何人可访问；设置后打开面板需输入密码</div>
+        <label class="check-line"><input type="checkbox" id="clearPanelPassword" /> 清除密码（关闭访问保护）</label>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="pill" id="tgTest">发送测试</button>
+        <button type="button" class="pill" id="setCancel">取消</button>
+        <button type="button" class="pill primary" id="setSubmit">保存</button>
+      </div>
+    </div>
+  </div>
+
+  
+  <div class="modal-mask" id="editModal">
+    <div class="modal">
+      <h3>编辑筛选规则</h3>
+      <div class="field">
+        <label>显示名称</label>
+        <input id="editName" />
+      </div>
+      <div id="editGithubFields">
+        <div class="field">
+          <label>扩展名（可多选，不选=不限）</label>
+          <div class="chip-multi" id="editExtChips"></div>
+        </div>
+        <div class="field">
+          <label>系统（可多选）</label>
+          <div class="chip-multi" id="editOsChips"></div>
+        </div>
+        <div class="field">
+          <label>架构（可多选）</label>
+          <div class="chip-multi" id="editArchChips"></div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>文件名包含（逗号分隔）</label>
+            <input id="editInclude" />
+          </div>
+          <div class="field">
+            <label>文件名排除（逗号分隔）</label>
+            <input id="editExclude" />
+          </div>
+        </div>
+        <div class="field">
+          <label><input type="checkbox" id="editPrerelease" checked /> 包含预发布</label>
+        </div>
+      </div>
+      <div class="field-hint" id="editArticleHint" hidden>文章类型仅可改名称；标题变化时会整页重抓网盘。</div>
+      <div class="modal-actions">
+        <button type="button" class="pill" id="editCancel">取消</button>
+        <button type="button" class="pill primary" id="editSubmit">保存并检查</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+.venv/
+.venv313/
+__pycache__/
+**/__pycache__/
+*.pyc
+data/*.db
+data/*.db-*
+.DS_Store
+node_modules/
+prototype/node_modules/
+prototype/dist/
+prototype/.npm-cache/
+**/.npm-cache/

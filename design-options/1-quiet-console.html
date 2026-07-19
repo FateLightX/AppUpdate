@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>方案 1 · 安静控制台</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --text: #111827;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --accent: #0f766e;
+    --accent-soft: #ccfbf1;
+    --warn: #b45309;
+    --warn-soft: #ffedd5;
+    --ok: #047857;
+    --ok-soft: #d1fae5;
+    --side: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Noto Sans SC", "PingFang SC", "Helvetica Neue", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+  .sidebar {
+    background: var(--side);
+    border-right: 1px solid var(--line);
+    padding: 20px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .brand {
+    font-weight: 650;
+    font-size: 16px;
+    letter-spacing: 0.02em;
+    padding: 8px 10px 18px;
+  }
+  .nav a {
+    display: block;
+    text-decoration: none;
+    color: var(--muted);
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 2px;
+  }
+  .nav a.active, .nav a:hover {
+    background: #f3f4f6;
+    color: var(--text);
+  }
+  .nav a.active { font-weight: 600; color: var(--accent); background: var(--accent-soft); }
+  .side-foot {
+    margin-top: auto;
+    padding: 12px;
+    color: var(--muted);
+    font-size: 12px;
+    border-top: 1px solid var(--line);
+  }
+  .main { padding: 24px 28px 40px; }
+  .top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+    gap: 16px;
+  }
+  h1 { margin: 0; font-size: 22px; font-weight: 650; }
+  .actions { display: flex; gap: 8px; }
+  button {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font: inherit;
+    cursor: pointer;
+  }
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .stats {
+    display: flex;
+    gap: 20px;
+    color: var(--muted);
+    margin-bottom: 14px;
+    padding: 0 2px;
+  }
+  .stats strong { color: var(--text); font-weight: 600; }
+  .chips { display: flex; gap: 8px; margin-bottom: 12px; }
+  .chip {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    border-radius: 999px;
+    padding: 6px 12px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .chip.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th, td {
+    text-align: left;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+  }
+  th {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 500;
+    background: #fafafa;
+  }
+  tr:last-child td { border-bottom: 0; }
+  .name { font-weight: 600; }
+  .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .tag {
+    display: inline-block;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #f3f4f6;
+    color: var(--muted);
+  }
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    padding: 3px 8px;
+    border-radius: 999px;
+  }
+  .status.up { background: var(--warn-soft); color: var(--warn); }
+  .status.ok { background: var(--ok-soft); color: var(--ok); }
+  .switch {
+    width: 36px; height: 20px; border-radius: 999px;
+    background: #d1d5db; position: relative;
+  }
+  .switch.on { background: var(--accent); }
+  .switch::after {
+    content: "";
+    position: absolute; top: 2px; left: 2px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #fff;
+  }
+  .switch.on::after { left: 18px; }
+  .banner {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+    background: #111827; color: #fff; padding: 8px 14px; border-radius: 999px;
+    font-size: 12px; z-index: 10; opacity: 0.92;
+  }
+</style>
+</head>
+<body>
+  <div class="banner">方案 1 · 安静控制台 · 列表优先</div>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">更新追踪</div>
+      <nav class="nav">
+        <a class="active" href="#">概览</a>
+        <a href="#">GitHub</a>
+        <a href="#">文章</a>
+        <a href="#">设置</a>
+      </nav>
+      <div class="side-foot">下次检查约 2 小时后<br/>间隔 6 小时</div>
+    </aside>
+    <main class="main">
+      <div class="top">
+        <h1>概览</h1>
+        <div class="actions">
+          <button>立即检查</button>
+          <button class="primary">添加追踪</button>
+        </div>
+      </div>
+      <div class="stats">
+        <span>追踪中 <strong>12</strong></span>
+        <span>有更新 <strong>2</strong></span>
+        <span>Telegram <strong>已连接</strong></span>
+      </div>
+      <div class="chips">
+        <span class="chip on">全部</span>
+        <span class="chip">GitHub</span>
+        <span class="chip">文章</span>
+        <span class="chip">仅有更新</span>
+      </div>
+      <div class="panel">
+        <table>
+          <thead>
+            <tr>
+              <th>名称</th>
+              <th>类型</th>
+              <th>当前状态</th>
+              <th>状态</th>
+              <th>上次检查</th>
+              <th>启用</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <div class="name">Clash Verge Rev</div>
+                <div class="sub">github.com/clash-verge-rev/clash-verge-rev</div>
+              </td>
+              <td><span class="tag">GitHub</span></td>
+              <td>v2.4.1 · macOS arm64 .dmg</td>
+              <td><span class="status up">有更新</span></td>
+              <td>10 分钟前</td>
+              <td><div class="switch on"></div></td>
+            </tr>
+            <tr>
+              <td>
+                <div class="name">某资源站更新帖</div>
+                <div class="sub">blog.example.com/post/1024</div>
+              </td>
+              <td><span class="tag">文章</span></td>
+              <td>标题已变 · 2 个网盘链接</td>
+              <td><span class="status up">有更新</span></td>
+              <td>10 分钟前</td>
+              <td><div class="switch on"></div></td>
+            </tr>
+            <tr>
+              <td>
+                <div class="name">LocalSend</div>
+                <div class="sub">github.com/localsend/localsend</div>
+              </td>
+              <td><span class="tag">GitHub</span></td>
+              <td>v1.17.0 · Windows x64</td>
+              <td><span class="status ok">正常</span></td>
+              <td>6 小时前</td>
+              <td><div class="switch on"></div></td>
+            </tr>
+            <tr>
+              <td>
+                <div class="name">工具合集说明</div>
+                <div class="sub">notes.example.com/tools</div>
+              </td>
+              <td><span class="tag">文章</span></td>
+              <td>原标题 · 百度 / 夸克</td>
+              <td><span class="status ok">正常</span></td>
+              <td>6 小时前</td>
+              <td><div class="switch on"></div></td>
+            </tr>
+            <tr>
+              <td>
+                <div class="name">App 内测包</div>
+                <div class="sub">github.com/example/app</div>
+              </td>
+              <td><span class="tag">GitHub</span></td>
+              <td>v0.9.2-beta · 已暂停</td>
+              <td><span class="status ok">正常</span></td>
+              <td>昨天</td>
+              <td><div class="switch"></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
