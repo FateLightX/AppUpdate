@@ -70,6 +70,10 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE settings ADD COLUMN panel_password_hash TEXT NOT NULL DEFAULT ''"
             )
+        if "telegram_detail" not in cols:
+            conn.execute(
+                "ALTER TABLE settings ADD COLUMN telegram_detail TEXT NOT NULL DEFAULT 'compact'"
+            )
 
         conn.executescript(
             """
@@ -141,6 +145,10 @@ def get_settings() -> dict[str, Any]:
         row = conn.execute("SELECT * FROM settings WHERE id = 1").fetchone()
         keys = row.keys()
         panel_hash = row["panel_password_hash"] if "panel_password_hash" in keys else ""
+        detail = "compact"
+        if "telegram_detail" in keys:
+            raw = (row["telegram_detail"] or "").strip().lower()
+            detail = "full" if raw == "full" else "compact"
         return {
             "intervalHours": row["interval_hours"],
             "botToken": row["bot_token"] or "",
@@ -149,6 +157,7 @@ def get_settings() -> dict[str, Any]:
             "hasToken": bool((row["bot_token"] or "").strip()),
             "panelPasswordHash": panel_hash or "",
             "hasPanelPassword": bool((panel_hash or "").strip()),
+            "telegramDetail": detail,
         }
 
 
@@ -158,6 +167,7 @@ def update_settings(
     bot_token: Optional[str] = None,
     chat_id: Optional[str] = None,
     panel_password_hash: Optional[str] = None,
+    telegram_detail: Optional[str] = None,
 ) -> dict[str, Any]:
     with connect() as conn:
         row = conn.execute("SELECT * FROM settings WHERE id = 1").fetchone()
@@ -169,9 +179,21 @@ def update_settings(
             new_hash = row["panel_password_hash"] if "panel_password_hash" in keys else ""
         else:
             new_hash = panel_password_hash
+        if telegram_detail is None:
+            if "telegram_detail" in keys:
+                new_detail = row["telegram_detail"] or "compact"
+            else:
+                new_detail = "compact"
+        else:
+            new_detail = "full" if str(telegram_detail).strip().lower() == "full" else "compact"
+        # ensure column exists for older DBs that skipped init path
+        if "telegram_detail" not in keys:
+            conn.execute(
+                "ALTER TABLE settings ADD COLUMN telegram_detail TEXT NOT NULL DEFAULT 'compact'"
+            )
         conn.execute(
-            "UPDATE settings SET interval_hours = ?, bot_token = ?, chat_id = ?, panel_password_hash = ? WHERE id = 1",
-            (new_interval, new_token, new_chat, new_hash or ""),
+            "UPDATE settings SET interval_hours = ?, bot_token = ?, chat_id = ?, panel_password_hash = ?, telegram_detail = ? WHERE id = 1",
+            (new_interval, new_token, new_chat, new_hash or "", new_detail),
         )
     return get_settings()
 

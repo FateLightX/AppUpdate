@@ -2,6 +2,8 @@ const state = {
   sources: [],
   filter: "all",
   selectedId: null,
+  openMenuId: null,
+  checkedIds: {},
   meta: { osOptions: [], archOptions: [], extOptions: [] },
   settings: null,
   addType: "github",
@@ -13,6 +15,7 @@ const state = {
   editExts: [],
   editOs: [],
   editArch: [],
+  tgDetail: "compact",
 };
 
 const $ = (id) => document.getElementById(id);
@@ -25,6 +28,75 @@ function typeLabel(type) {
 
 function tgMetaLabel() {
   return state.settings?.telegramConfigured ? "TG 已开" : "TG 未配";
+}
+
+function detectAddType(url) {
+  const raw = String(url || "").trim();
+  if (!raw) return null;
+  const lower = raw.toLowerCase();
+  if (lower.includes("github.com") || lower.startsWith("git@github.com:")) return "github";
+
+  // netdisk hosts / patterns (align with backend providers)
+  const netdiskHints = [
+    "pan.baidu.com",
+    "yun.baidu.com",
+    "alipan.com",
+    "aliyundrive.com",
+    "pan.quark.cn",
+    "123pan.com",
+    "123684.com",
+    "123865.com",
+    "123912.com",
+    "cloud.189.cn",
+    "lanzou",
+    "lanoso.com",
+  ];
+  if (netdiskHints.some((h) => lower.includes(h))) return "netdisk";
+  if (/^https?:\/\//i.test(raw)) return "article";
+  return null;
+}
+
+function extractShareCodeFromUrl(url) {
+  const m = String(url || "").match(/[?&](?:pwd|password|code)=([A-Za-z0-9]+)/i);
+  return m ? m[1] : "";
+}
+
+function applyUrlAutoDetect() {
+  const input = $("addUrl");
+  if (!input) return;
+  const url = input.value.trim();
+  const detected = detectAddType(url);
+  if (!detected) return;
+  if (state.addType !== detected) {
+    state.addType = detected;
+    syncAddTypeUI();
+  }
+  if (detected === "netdisk") {
+    const code = extractShareCodeFromUrl(url);
+    const codeEl = $("addShareCode");
+    if (codeEl && code && !codeEl.value.trim()) {
+      codeEl.value = code;
+    }
+  }
+}
+
+function netdiskProbe(item) {
+  const d0 = (item.netdisks || [])[0] || {};
+  const mode = d0.mode || item.probeMode || "";
+  if (mode === "fingerprint") {
+    return { mode: "fingerprint", label: d0.modeLabel || "页面指纹", weak: true };
+  }
+  if (mode === "list") {
+    return { mode: "list", label: d0.modeLabel || "文件列表", weak: false };
+  }
+  // legacy rows before mode field
+  if (item.type === "netdisk" && item.lastCheck) {
+    if ((item.summary || "").includes("页面指纹")) {
+      return { mode: "fingerprint", label: "页面指纹", weak: true };
+    }
+    return { mode: "list", label: "文件列表", weak: false };
+  }
+  return { mode: "", label: "", weak: false };
 }
 
 function toast(msg) {
@@ -167,6 +239,16 @@ function statusLabel(item) {
   return "正常";
 }
 
+function shortError(item, maxLen = 36) {
+  let msg = String(item.lastError || item.summary || "检查失败").trim();
+  msg = msg.replace(/^Client error '[^']*' for url '[^']*'\s*/i, "");
+  msg = msg.replace(/^检查失败[：:]\s*/i, "");
+  msg = msg.replace(/\s*For more information check:.*$/i, "");
+  msg = msg.replace(/\s+/g, " ");
+  if (!msg) msg = "检查失败";
+  return msg.length > maxLen ? msg.slice(0, maxLen - 1) + "…" : msg;
+}
+
 function statusClass(item) {
   if (!item.enabled || item.status === "off") return "status-off";
   if (item.status === "update" || item.hasUpdate) return "status-up";
@@ -196,6 +278,18 @@ function formatTime(iso) {
   }
 }
 
+function shortUrl(url) {
+  try {
+    const u = new URL(url);
+    const path = (u.pathname || "/").replace(/\/+$/, "") || "";
+    const shortPath = path.length > 28 ? path.slice(0, 26) + "…" : path;
+    return u.host + (shortPath && shortPath !== "/" ? shortPath : "");
+  } catch {
+    const s = String(url || "");
+    return s.length > 42 ? s.slice(0, 40) + "…" : s;
+  }
+}
+
 function parseKeywords(text) {
   return String(text || "")
     .split(/[,，\s]+/)
@@ -212,6 +306,121 @@ function filteredSources() {
     if (state.filter === "netdisk") return s.type === "netdisk";
     return true;
   });
+}
+
+function renderEmptyState() {
+  // 有数据但被筛选滤空
+  if (state.sources.length > 0) {
+    const filterLabel =
+      { all: "全部", update: "有更新", github: "GitHub", article: "文章", netdisk: "网盘" }[state.filter] ||
+      state.filter;
+    return `
+      <div class="empty-state">
+        <div class="empty-title">「${escapeHtml(filterLabel)}」下没有项目</div>
+        <div class="empty-desc">换个筛选，或添加新的追踪项。</div>
+        <div class="empty-actions">
+          <button type="button" class="pill" data-empty-act="filter-all">查看全部</button>
+          <button type="button" class="pill primary" data-empty-act="add">添加</button>
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div class="empty-state">
+      <div class="empty-title">还没有追踪项</div>
+      <div class="empty-desc">添加后会定时检查：GitHub 新版本、文章网盘变化、分享页文件更新。有变化时可推 Telegram。</div>
+      <div class="empty-cards">
+        <button type="button" class="empty-card" data-empty-act="sample-github">
+          <span class="empty-card-tag">GitHub</span>
+          <span class="empty-card-title">仓库 Release</span>
+          <span class="empty-card-desc">按扩展名 / 系统 / 架构筛下载附件</span>
+        </button>
+        <button type="button" class="empty-card" data-empty-act="sample-article">
+          <span class="empty-card-tag">文章</span>
+          <span class="empty-card-title">博客页面</span>
+          <span class="empty-card-desc">盯标题变化，抓页内网盘链接与提取码</span>
+        </button>
+        <button type="button" class="empty-card" data-empty-act="sample-netdisk">
+          <span class="empty-card-tag">网盘</span>
+          <span class="empty-card-title">分享链接</span>
+          <span class="empty-card-desc">直接监控分享文件列表（可选提取码）</span>
+        </button>
+      </div>
+      <div class="empty-actions">
+        <button type="button" class="pill primary" data-empty-act="add">添加追踪</button>
+      </div>
+    </div>`;
+}
+
+function openAddSample(kind) {
+  openAdd();
+  if (kind === "github") {
+    state.addType = "github";
+    state.addExts = [".dmg", ".zip"];
+    state.addOs = ["macos"];
+    state.addArch = ["arm64"];
+    $("addUrl").value = "https://github.com/cli/cli";
+    $("addName").value = "示例 · GitHub CLI";
+    if ($("addInclude")) $("addInclude").value = "";
+    if ($("addExclude")) $("addExclude").value = "";
+    if ($("addPrerelease")) $("addPrerelease").checked = true;
+  } else if (kind === "article") {
+    state.addType = "article";
+    $("addUrl").value = "https://example.com/your-post";
+    $("addName").value = "示例 · 文章";
+  } else if (kind === "netdisk") {
+    state.addType = "netdisk";
+    $("addUrl").value = "https://pan.baidu.com/s/1xxxxxxxx?pwd=abcd";
+    $("addName").value = "示例 · 网盘分享";
+    if ($("addShareCode")) $("addShareCode").value = "abcd";
+  }
+  syncAddTypeUI();
+  renderAddChips();
+  toast("已填入示例，改成你的地址后保存即可");
+  setTimeout(() => $("addUrl")?.focus(), 50);
+}
+
+function checkedIdList() {
+  return Object.keys(state.checkedIds)
+    .map((x) => Number(x))
+    .filter((id) => state.checkedIds[id] && state.sources.some((s) => s.id === id));
+}
+
+function setChecked(id, on) {
+  if (on) state.checkedIds[id] = true;
+  else delete state.checkedIds[id];
+}
+
+function clearChecked() {
+  state.checkedIds = {};
+}
+
+function pruneChecked() {
+  const alive = new Set(state.sources.map((s) => s.id));
+  for (const k of Object.keys(state.checkedIds)) {
+    if (!alive.has(Number(k))) delete state.checkedIds[k];
+  }
+}
+
+function renderBulkBar() {
+  const bar = $("bulkBar");
+  const failedBtn = $("btnCheckFailed");
+  const failedCount = state.sources.filter(
+    (s) => s.enabled && (s.status === "error" || s.lastError),
+  ).length;
+  if (failedBtn) {
+    failedBtn.hidden = failedCount === 0;
+    failedBtn.textContent = failedCount ? `检查失败项 (${failedCount})` : "检查失败项";
+  }
+  if (!bar) return;
+  const ids = checkedIdList();
+  const n = ids.length;
+  bar.hidden = n === 0;
+  if ($("bulkCount")) $("bulkCount").textContent = `已选 ${n} 项`;
+  const list = filteredSources();
+  const allChecked = list.length > 0 && list.every((s) => state.checkedIds[s.id]);
+  if ($("bulkSelectAll")) $("bulkSelectAll").checked = allChecked;
+  if ($("headSelectAll")) $("headSelectAll").checked = allChecked;
 }
 
 function renderFilters() {
@@ -231,6 +440,14 @@ function renderFilters() {
 }
 
 function metricFacts(item) {
+  if (item.status === "error") {
+    const err = shortError(item);
+    return `
+      <div class="facts">
+        <div class="fact-main fact-err" title="${escapeHtml(item.lastError || err)}">${escapeHtml(err)}</div>
+        <div class="fact-sub">检查失败 · 可重试</div>
+      </div>`;
+  }
   if (item.type === "github") {
     const matched = (item.assets || []).length;
     const unmatched = (item.unmatchedAssets || []).length;
@@ -254,15 +471,16 @@ function metricFacts(item) {
     const files = item.assets || [];
     const title = item.title || item.version || "尚未检查";
     const short = title.length > 28 ? `${title.slice(0, 28)}…` : title;
-    const sub = files.length
-      ? `${files.length} 个文件/文件夹`
-      : item.lastCheck
-        ? (item.summary || "已检查")
-        : "等待检查";
+    const probe = netdiskProbe(item);
+    let sub = "等待检查";
+    if (item.lastCheck) {
+      const count = files.length ? `${files.length} 个文件/文件夹` : "已检查";
+      sub = probe.label ? `${count} · ${probe.label}` : count;
+    }
     return `
     <div class="facts">
       <div class="fact-main ${item.hasUpdate || item.status === "update" ? "warn" : ""}" title="${escapeHtml(title)}">${escapeHtml(short)}</div>
-      <div class="fact-sub">${escapeHtml(sub)}</div>
+      <div class="fact-sub">${escapeHtml(sub)}${probe.weak ? ' <span class="probe-pill weak">指纹</span>' : probe.mode === "list" ? ' <span class="probe-pill">列表</span>' : ""}</div>
     </div>`;
   }
   const disks = item.netdisks || [];
@@ -284,38 +502,54 @@ function metricFacts(item) {
 
 function renderList() {
   const list = filteredSources();
+  pruneChecked();
   const enabled = state.sources.filter((s) => s.enabled).length;
   $("onlineBadge").querySelector("span").textContent = `${enabled} 启用`;
   $("onlineBadge").classList.toggle("warn", state.sources.some((s) => s.hasUpdate));
   $("statsText").textContent = `共 ${state.sources.length} 项 · 显示 ${list.length} 项`;
+  renderBulkBar();
 
   if (!list.length) {
-    $("rows").innerHTML = `<div class="empty">还没有追踪项。点右上角「添加」开始。</div>`;
+    $("rows").innerHTML = renderEmptyState();
     return;
   }
 
   $("rows").innerHTML = list
     .map((item) => {
       const active = item.id === state.selectedId ? "active" : "";
+      const checked = state.checkedIds[item.id] ? "checked" : "";
       const detail =
         item.id === state.selectedId
           ? `<div class="row-detail" data-stop data-detail-id="${item.id}">${buildDetailHtml(item)}</div>`
           : "";
       return `
       <div class="row ${active}" data-id="${item.id}">
-        <div><span class="${dotClass(item)}"></span></div>
+        <div class="row-lead" data-stop>
+          <input type="checkbox" class="row-check" data-check-id="${item.id}" ${checked} aria-label="选择 ${escapeHtml(item.name)}" />
+          <span class="${dotClass(item)}"></span>
+        </div>
         <div>
           <div class="name">${escapeHtml(item.name)}</div>
-          <div class="sub">${escapeHtml(formatTime(item.lastCheck))} · ${escapeHtml(item.url)}</div>
+          <div class="sub">${escapeHtml(formatTime(item.lastCheck))}${item.url ? " · " + escapeHtml(shortUrl(item.url)) : ""}</div>
         </div>
         <div><span class="tag">${typeLabel(item.type)}</span></div>
         <div>${metricFacts(item)}</div>
         <div class="${statusClass(item)}">${statusLabel(item)}</div>
         <div class="row-actions" data-stop>
           <button type="button" class="link-btn" data-act="check" data-id="${item.id}">检查</button>
-          <button type="button" class="link-btn" data-act="edit" data-id="${item.id}">编辑</button>
-          <button type="button" class="link-btn" data-act="toggle" data-id="${item.id}">${item.enabled ? "停用" : "启用"}</button>
-          <button type="button" class="link-btn danger" data-act="del" data-id="${item.id}">删除</button>
+          <div class="more-wrap">
+            <button type="button" class="more-btn ${state.openMenuId === item.id ? "on" : ""}" data-act="menu" data-id="${item.id}" aria-label="更多操作" aria-expanded="${state.openMenuId === item.id ? "true" : "false"}">⋯</button>
+            ${
+              state.openMenuId === item.id
+                ? `<div class="more-menu" role="menu">
+                    ${item.hasUpdate || item.status === "update" ? `<button type="button" class="more-item" data-act="ack" data-id="${item.id}" role="menuitem">已知晓</button>` : ""}
+                    <button type="button" class="more-item" data-act="edit" data-id="${item.id}" role="menuitem">编辑</button>
+                    <button type="button" class="more-item" data-act="toggle" data-id="${item.id}" role="menuitem">${item.enabled ? "停用" : "启用"}</button>
+                    <button type="button" class="more-item danger" data-act="del" data-id="${item.id}" role="menuitem">删除</button>
+                  </div>`
+                : ""
+            }
+          </div>
         </div>
       </div>${detail}`;
     })
@@ -385,17 +619,21 @@ function buildDetailHtml(item) {
     const files = item.assets || [];
     const disks = item.netdisks || [];
     const d0 = disks[0] || {};
+    const probe = netdiskProbe(item);
+    const probeHint = probe.mode === "fingerprint"
+      ? "当前为页面指纹模式：无法稳定列出文件时用页面内容变化判断，可能延迟或误报。"
+      : "当前为文件列表模式：按分享内文件名/大小变化判断更新，更可靠。";
     body += `
       <div class="rule-box">
-        <div class="rule-title">分享信息</div>
+        <div class="rule-title">分享信息 ${probe.label ? `<span class="probe-pill ${probe.weak ? "weak" : ""}">${escapeHtml(probe.label)}</span>` : ""}</div>
         <div class="rule-text">${escapeHtml(item.ruleText || "无提取码")}</div>
-        <div class="rule-hint">按分享内文件列表（或页面指纹）变化判断更新。</div>
+        <div class="rule-hint">${escapeHtml(probeHint)}${d0.note ? " " + escapeHtml(d0.note) : ""}</div>
         <div style="margin-top:8px"><button type="button" class="link-btn" data-act="edit-detail" data-id="${item.id}">编辑</button></div>
       </div>
       <div class="section-label">分享标题</div><div>${escapeHtml(item.title || item.version || "-")}</div>
-      <div class="section-label">文件列表 ${files.length}</div>`;
+      <div class="section-label">${probe.mode === "fingerprint" ? "探测内容" : "文件列表"} ${files.length}</div>`;
     if (!files.length) {
-      body += `<div class="empty" style="padding:16px 0">暂未列出文件（仍可按页面指纹监控）</div>`;
+      body += `<div class="empty" style="padding:16px 0">${probe.mode === "fingerprint" ? "暂无结构化文件列表，已用页面指纹监控" : "暂未列出文件"}</div>`;
     } else {
       body += files
         .map(
@@ -454,6 +692,9 @@ function buildDetailHtml(item) {
   const urlHtml = srcUrl
     ? `<a class="url url-link" href="${escapeHtml(srcUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(srcUrl)}</a>`
     : `<div class="url">-</div>`;
+  // 类型/状态/上次检查已在列表行展示，详情只保留可点原链接 + TG
+  const tg = tgMetaLabel();
+  const tgOn = !!state.settings?.telegramConfigured;
 
   return `
     <div class="detail">
@@ -461,20 +702,13 @@ function buildDetailHtml(item) {
         <div class="detail-title">
           <h3>${escapeHtml(item.name)}</h3>
           ${urlHtml}
+          <div class="detail-tg ${tgOn ? "on" : ""}" title="Telegram 推送">${escapeHtml(tg)}</div>
         </div>
         <div class="detail-actions">
+          ${item.hasUpdate || item.status === "update" ? `<button type="button" class="pill ack-btn" data-act="ack" data-id="${item.id}">已知晓</button>` : ""}
           <button type="button" class="switch ${item.enabled ? "on" : ""}" data-act="toggle" data-id="${item.id}" aria-label="启用停用"></button>
           <button type="button" class="icon-btn" data-act="close-detail" aria-label="关闭详情">×</button>
         </div>
-      </div>
-      <div class="meta-strip" aria-label="检查信息">
-        <span class="meta-tag">${escapeHtml(typeLabel(item.type))}</span>
-        <span class="meta-dot" aria-hidden="true">·</span>
-        <span class="${statusClass(item)}">${escapeHtml(statusLabel(item))}</span>
-        <span class="meta-dot" aria-hidden="true">·</span>
-        <span class="meta-muted" title="上次检查">${escapeHtml(formatTime(item.lastCheck))}</span>
-        <span class="meta-dot" aria-hidden="true">·</span>
-        <span class="meta-muted" title="Telegram">${escapeHtml(tgMetaLabel())}</span>
       </div>
       ${body}
     </div>`;
@@ -661,6 +895,7 @@ function syncAddTypeUI() {
 async function submitAdd() {
   const url = $("addUrl").value.trim();
   if (!url) return toast("请填写地址");
+  applyUrlAutoDetect();
   const body = {
     type: state.addType,
     url,
@@ -693,11 +928,19 @@ async function submitAdd() {
   }
 }
 
+function syncTgDetailUI() {
+  document.querySelectorAll("#tgDetailTabs .mini-chip").forEach((btn) => {
+    btn.classList.toggle("on", btn.dataset.tgDetail === state.tgDetail);
+  });
+}
+
 function openSettings() {
   const s = state.settings || {};
   $("setInterval").value = s.intervalHours || 6;
   $("setToken").value = "";
   $("setChatId").value = s.chatId || "";
+  state.tgDetail = s.telegramDetail === "full" ? "full" : "compact";
+  syncTgDetailUI();
   $("tokenHint").textContent = s.hasToken
     ? `已保存 Token ${s.tokenMasked || ""}，留空则不修改`
     : "尚未配置 Token";
@@ -715,6 +958,7 @@ async function submitSettings() {
   const body = {
     intervalHours: Number($("setInterval").value || 6),
     chatId: $("setChatId").value.trim(),
+    telegramDetail: state.tgDetail === "full" ? "full" : "compact",
   };
   const token = $("setToken").value.trim();
   if (token) body.botToken = token;
@@ -747,22 +991,104 @@ async function submitSettings() {
   }
 }
 
-async function checkNow(sourceId) {
+async function checkNow(sourceId, options = {}) {
   if (state.checking) return;
   state.checking = true;
   $("btnCheck").classList.add("checking");
   $("btnCheck").disabled = true;
+  if ($("btnCheckFailed")) $("btnCheckFailed").disabled = true;
   try {
-    const q = sourceId ? `?sourceId=${sourceId}` : "";
-    const result = await api(`/api/check${q}`, { method: "POST" });
+    let result;
+    if (sourceId) {
+      result = await api(`/api/check?sourceId=${sourceId}`, { method: "POST" });
+    } else if (options.failedOnly) {
+      result = await api(`/api/check?failedOnly=true`, { method: "POST" });
+    } else if (options.ids && options.ids.length) {
+      result = await api(`/api/check`, {
+        method: "POST",
+        body: JSON.stringify({ sourceIds: options.ids }),
+      });
+    } else {
+      result = await api(`/api/check`, { method: "POST" });
+    }
     await loadAll();
-    toast(`检查完成：${result.checked} 项，更新 ${result.updated}，失败 ${result.errors}`);
+    if (result.checked === 0) {
+      toast(options.failedOnly ? "没有失败项需要检查" : "没有可检查的项目");
+    } else {
+      toast(`检查完成：${result.checked} 项，更新 ${result.updated}，失败 ${result.errors}`);
+    }
   } catch (e) {
     toast(e.message || "检查失败");
   } finally {
     state.checking = false;
     $("btnCheck").classList.remove("checking");
     $("btnCheck").disabled = false;
+    if ($("btnCheckFailed")) $("btnCheckFailed").disabled = false;
+  }
+}
+
+async function batchAction(action) {
+  const ids = checkedIdList();
+  if (!ids.length) return toast("请先勾选项目");
+  if (action === "check") {
+    await checkNow(null, { ids });
+    return;
+  }
+  if (action === "clear") {
+    clearChecked();
+    renderAll();
+    return;
+  }
+  if (action === "ack") {
+    const targets = ids.filter((id) => {
+      const s = state.sources.find((x) => x.id === id);
+      return s && (s.hasUpdate || s.status === "update");
+    });
+    if (!targets.length) return toast("选中项没有「有更新」状态");
+    try {
+      let n = 0;
+      for (const id of targets) {
+        await api(`/api/sources/${id}/ack`, { method: "POST" });
+        n += 1;
+      }
+      await loadAll();
+      toast(`已标为已知晓 ${n} 项`);
+    } catch (e) {
+      toast(e.message || "批量已知晓失败");
+    }
+    return;
+  }
+  if (action === "delete") {
+    if (!confirm(`确定删除选中的 ${ids.length} 项？`)) return;
+  }
+  try {
+    const map = { enable: "enable", disable: "disable", delete: "delete" };
+    const res = await api("/api/sources/batch", {
+      method: "POST",
+      body: JSON.stringify({ action: map[action], ids }),
+    });
+    if (action === "delete") clearChecked();
+    await loadAll();
+    const label = { enable: "已启用", disable: "已停用", delete: "已删除" }[action] || "完成";
+    toast(`${label} ${res.done || ids.length} 项`);
+  } catch (e) {
+    toast(e.message || "批量操作失败");
+  }
+}
+
+function toggleSelectAllVisible(on) {
+  const list = filteredSources();
+  for (const s of list) setChecked(s.id, on);
+  renderAll();
+}
+
+async function ackUpdate(id) {
+  try {
+    await api(`/api/sources/${id}/ack`, { method: "POST" });
+    await loadAll();
+    toast("已标为已知晓");
+  } catch (e) {
+    toast(e.message || "操作失败");
   }
 }
 
@@ -795,7 +1121,25 @@ async function deleteSource(id) {
 function bindEvents() {
   $("btnAdd").onclick = openAdd;
   $("btnCheck").onclick = () => checkNow();
+  if ($("btnCheckFailed")) $("btnCheckFailed").onclick = () => checkNow(null, { failedOnly: true });
   $("btnSettings").onclick = openSettings;
+  if ($("bulkBar")) {
+    $("bulkBar").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-bulk]");
+      if (!btn) return;
+      batchAction(btn.dataset.bulk);
+    });
+  }
+  if ($("bulkSelectAll")) {
+    $("bulkSelectAll").addEventListener("change", (e) => {
+      toggleSelectAllVisible(!!e.target.checked);
+    });
+  }
+  if ($("headSelectAll")) {
+    $("headSelectAll").addEventListener("change", (e) => {
+      toggleSelectAllVisible(!!e.target.checked);
+    });
+  }
   if ($("btnLogout")) $("btnLogout").onclick = doLogout;
   if ($("loginSubmit")) $("loginSubmit").onclick = doLogin;
   if ($("loginPassword")) {
@@ -818,6 +1162,12 @@ function bindEvents() {
   $("setCancel").onclick = () => $("settingsModal").classList.remove("show");
   $("addSubmit").onclick = submitAdd;
   $("setSubmit").onclick = submitSettings;
+  if ($("addUrl")) {
+    const onUrl = () => applyUrlAutoDetect();
+    $("addUrl").addEventListener("input", onUrl);
+    $("addUrl").addEventListener("paste", () => setTimeout(onUrl, 0));
+    $("addUrl").addEventListener("change", onUrl);
+  }
   $("tgTest").onclick = async () => {
     try {
       // save chat first if filled
@@ -836,6 +1186,16 @@ function bindEvents() {
     };
   });
 
+  const tgTabs = $("tgDetailTabs");
+  if (tgTabs) {
+    tgTabs.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-tg-detail]");
+      if (!btn) return;
+      state.tgDetail = btn.dataset.tgDetail === "full" ? "full" : "compact";
+      syncTgDetailUI();
+    });
+  }
+
   ["extChips", "osChips", "archChips"].forEach((id) => {
     $(id).addEventListener("click", (e) => {
       const btn = e.target.closest(".mini-chip");
@@ -852,6 +1212,32 @@ function bindEvents() {
   });
 
   $("rows").addEventListener("click", (e) => {
+    const checkEl = e.target.closest(".row-check, #headSelectAll");
+    if (checkEl && checkEl.classList.contains("row-check")) {
+      e.stopPropagation();
+      const id = Number(checkEl.dataset.checkId);
+      setChecked(id, !!checkEl.checked);
+      renderBulkBar();
+      // sync select-all boxes without full re-render of rows
+      const list = filteredSources();
+      const allChecked = list.length > 0 && list.every((s) => state.checkedIds[s.id]);
+      if ($("bulkSelectAll")) $("bulkSelectAll").checked = allChecked;
+      if ($("headSelectAll")) $("headSelectAll").checked = allChecked;
+      return;
+    }
+    const emptyAct = e.target.closest("[data-empty-act]");
+    if (emptyAct) {
+      e.stopPropagation();
+      const act = emptyAct.dataset.emptyAct;
+      if (act === "add") openAdd();
+      else if (act === "filter-all") {
+        state.filter = "all";
+        renderAll();
+      } else if (act === "sample-github") openAddSample("github");
+      else if (act === "sample-article") openAddSample("article");
+      else if (act === "sample-netdisk") openAddSample("netdisk");
+      return;
+    }
     const copy = e.target.closest("[data-copy]");
     if (copy) {
       e.stopPropagation();
@@ -865,13 +1251,42 @@ function bindEvents() {
       const act = actBtn.dataset.act;
       if (act === "close-detail") {
         state.selectedId = null;
+        state.openMenuId = null;
         renderAll();
         return;
       }
-      if (act === "check") checkNow(id);
-      if (act === "edit" || act === "edit-detail") openEdit(id);
-      if (act === "toggle") toggleEnabled(id);
-      if (act === "del") deleteSource(id);
+      if (act === "menu") {
+        state.openMenuId = state.openMenuId === id ? null : id;
+        renderAll();
+        return;
+      }
+      state.openMenuId = null;
+      if (act === "check") {
+        renderAll();
+        checkNow(id);
+        return;
+      }
+      if (act === "edit" || act === "edit-detail") {
+        renderAll();
+        openEdit(id);
+        return;
+      }
+      if (act === "toggle") {
+        renderAll();
+        toggleEnabled(id);
+        return;
+      }
+      if (act === "del") {
+        renderAll();
+        deleteSource(id);
+        return;
+      }
+      if (act === "ack") {
+        renderAll();
+        ackUpdate(id);
+        return;
+      }
+      renderAll();
       return;
     }
     // 详情区域内的空白点击不切换行
@@ -881,7 +1296,8 @@ function bindEvents() {
     const row = e.target.closest(".row[data-id]");
     if (!row) return;
     const id = Number(row.dataset.id);
-    // 再点同一行则收起详情
+    // 再点同一行则收起详情；切换行时收起更多菜单
+    state.openMenuId = null;
     state.selectedId = state.selectedId === id ? null : id;
     renderAll();
     if (state.selectedId != null) {
@@ -899,8 +1315,20 @@ function bindEvents() {
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     if (document.querySelector(".modal-mask.show, .login-gate:not([hidden])")) return;
+    if (state.openMenuId != null) {
+      state.openMenuId = null;
+      renderAll();
+      return;
+    }
     if (state.selectedId == null) return;
     state.selectedId = null;
+    renderAll();
+  });
+
+  document.addEventListener("click", (e) => {
+    if (state.openMenuId == null) return;
+    if (e.target.closest(".more-wrap")) return;
+    state.openMenuId = null;
     renderAll();
   });
 }

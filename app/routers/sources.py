@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException
 
 from app import db
 from app.models import SourceCreate, SourceUpdate
+from pydantic import BaseModel, Field
 from app.services import article_svc, github_svc, netdisk_svc
 from app.services.match import ARCH_OPTIONS, EXT_OPTIONS, OS_OPTIONS, describe_rule, normalize_rule
 
@@ -39,6 +40,46 @@ def filter_meta() -> dict[str, Any]:
 def list_all() -> list[dict[str, Any]]:
     return [_public(s) for s in db.list_sources()]
 
+
+
+
+class SourceBatchBody(BaseModel):
+    action: Literal["enable", "disable", "delete"]
+    ids: list[int] = Field(default_factory=list)
+
+
+@router.post("/batch")
+def batch_sources(body: SourceBatchBody) -> dict[str, Any]:
+    ids = [int(x) for x in (body.ids or []) if int(x) > 0]
+    if not ids:
+        raise HTTPException(400, "请选择至少一个项目")
+    # de-dupe preserve order
+    seen = set()
+    uniq: list[int] = []
+    for i in ids:
+        if i not in seen:
+            seen.add(i)
+            uniq.append(i)
+
+    done = 0
+    missing = 0
+    if body.action == "delete":
+        for sid in uniq:
+            if db.delete_source(sid):
+                done += 1
+            else:
+                missing += 1
+        return {"ok": True, "action": body.action, "done": done, "missing": missing}
+
+    enabled = body.action == "enable"
+    for sid in uniq:
+        src = db.get_source(sid)
+        if not src:
+            missing += 1
+            continue
+        db.update_source(sid, {"enabled": enabled})
+        done += 1
+    return {"ok": True, "action": body.action, "done": done, "missing": missing}
 
 @router.get("/{source_id}")
 def get_one(source_id: int) -> dict[str, Any]:

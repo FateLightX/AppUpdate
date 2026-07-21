@@ -25,12 +25,32 @@
   <main class="wrap">
     <div class="toolbar">
       <div class="filters" id="filters"></div>
-      <div class="sub" id="statsText">加载中…</div>
+      <div class="toolbar-right">
+        <button type="button" class="link-btn" id="btnCheckFailed" hidden>检查失败项</button>
+        <div class="sub" id="statsText">加载中…</div>
+      </div>
+    </div>
+
+    <div class="bulk-bar" id="bulkBar" hidden>
+      <div class="bulk-left">
+        <label class="bulk-check"><input type="checkbox" id="bulkSelectAll" /> 全选当前</label>
+        <span class="bulk-count" id="bulkCount">已选 0 项</span>
+      </div>
+      <div class="bulk-actions">
+        <button type="button" class="pill" data-bulk="check">检查</button>
+        <button type="button" class="pill" data-bulk="ack">已知晓</button>
+        <button type="button" class="pill" data-bulk="enable">启用</button>
+        <button type="button" class="pill" data-bulk="disable">停用</button>
+        <button type="button" class="pill danger-pill" data-bulk="delete">删除</button>
+        <button type="button" class="link-btn" data-bulk="clear">取消</button>
+      </div>
     </div>
 
     <section class="panel" id="listPanel">
       <div class="row head">
-        <div></div>
+        <div class="row-lead head-lead" data-stop>
+          <input type="checkbox" id="headSelectAll" title="全选当前列表" aria-label="全选当前列表" />
+        </div>
         <div>名称</div>
         <div>类型</div>
         <div>结果</div>
@@ -68,6 +88,7 @@
       <div class="field">
         <label id="urlLabel">GitHub 仓库完整地址</label>
         <input id="addUrl" placeholder="https://github.com/owner/repo" />
+        <div class="field-hint" id="addUrlHint">粘贴链接后会自动识别 GitHub / 文章 / 网盘；网盘链接里的提取码也会尝试填入。</div>
       </div>
       <div class="field">
         <label>显示名称（可选）</label>
@@ -133,6 +154,14 @@
       <div class="field">
         <label>Telegram Chat ID</label>
         <input id="setChatId" placeholder="如 123456789" />
+      </div>
+      <div class="field">
+        <label>Telegram 推送内容</label>
+        <div class="type-tabs" id="tgDetailTabs">
+          <button type="button" class="mini-chip on" data-tg-detail="compact">简洁</button>
+          <button type="button" class="mini-chip" data-tg-detail="full">详细</button>
+        </div>
+        <div class="field-hint">简洁：少列文件、不塞满下载链接，末行提示看面板。详细：更多条目并附链接。</div>
       </div>
       <div class="field">
         <label>面板访问密码（可选）</label>

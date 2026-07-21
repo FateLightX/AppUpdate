@@ -71,7 +71,11 @@ async def check_one(source: dict[str, Any], *, notify: bool = True) -> dict[str,
             settings = db.get_settings()
             if settings.get("telegramConfigured"):
                 try:
-                    text = format_update_message(source, result)
+                    text = format_update_message(
+                        source,
+                        result,
+                        detail=settings.get("telegramDetail") or "compact",
+                    )
                     await send_telegram(settings["botToken"], settings["chatId"], text)
                 except Exception as e:  # noqa: BLE001
                     log.warning("telegram failed for %s: %s", source["id"], e)
@@ -103,12 +107,23 @@ async def check_one(source: dict[str, Any], *, notify: bool = True) -> dict[str,
         return {"id": source["id"], "ok": False, "error": msg, "updated": False}
 
 
-async def check_all(*, only_id: Optional[int] = None, notify: bool = True) -> dict[str, Any]:
+async def check_all(
+    *,
+    only_id: Optional[int] = None,
+    ids: Optional[list[int]] = None,
+    failed_only: bool = False,
+    notify: bool = True,
+) -> dict[str, Any]:
     sources = db.list_sources()
     if only_id is not None:
         sources = [s for s in sources if s["id"] == only_id]
+    elif ids is not None:
+        idset = {int(x) for x in ids}
+        sources = [s for s in sources if s["id"] in idset]
     else:
         sources = [s for s in sources if s.get("enabled")]
+        if failed_only:
+            sources = [s for s in sources if (s.get("status") == "error" or s.get("lastError"))]
 
     details = []
     updated = 0

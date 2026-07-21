@@ -114,7 +114,11 @@ def _result(
     files: list[dict[str, Any]],
     fingerprint: str,
     note: str = "",
+    mode: str = "list",
 ) -> dict[str, Any]:
+    """mode: list = real file listing; fingerprint = page/content hash only."""
+    mode = "fingerprint" if mode == "fingerprint" else "list"
+    mode_label = "页面指纹" if mode == "fingerprint" else "文件列表"
     assets = []
     for f in files:
         assets.append(
@@ -129,9 +133,9 @@ def _result(
         preview = " / ".join(a["name"][:24] for a in assets[:3])
         if file_count > 3:
             preview += f" 等{file_count}项"
-        summary = f"{provider_label} · {file_count} 项 · {preview}"
+        summary = f"{provider_label} · {file_count} 项 · {mode_label} · {preview}"
     else:
-        summary = f"{provider_label} · {(title or '分享')[:40]}"
+        summary = f"{provider_label} · {(title or '分享')[:40]} · {mode_label}"
         if note:
             summary += f" · {note}"
 
@@ -140,6 +144,9 @@ def _result(
         "title": (title or provider_label)[:120],
         "url": url,
         "code": code or "",
+        "mode": mode,
+        "modeLabel": mode_label,
+        "note": note or "",
     }
     return {
         "version": title or provider_label,
@@ -150,6 +157,8 @@ def _result(
         "summary": summary,
         "fingerprint": fingerprint,
         "html_url": url,
+        "probeMode": mode,
+        "probeModeLabel": mode_label,
     }
 
 
@@ -479,7 +488,16 @@ async def _fetch_lanzou(
         re.sub(r"\s+", " ", soup.get_text(" ", strip=True))[:4000].encode("utf-8", "ignore")
     ).hexdigest()[:16]
     fp = _fingerprint("lanzou", share_key or final_url, title, files, extra=extra)
-    return _result(url=url, provider_label=label, title=title, code=code, files=files, fingerprint=fp)
+    return _result(
+        url=url,
+        provider_label=label,
+        title=title,
+        code=code,
+        files=files,
+        fingerprint=fp,
+        mode="fingerprint",
+        note="单页指纹",
+    )
 
 
 async def _fetch_tianyi(
@@ -808,6 +826,7 @@ async def _fetch_html_fallback(
         files=files,
         fingerprint=fp,
         note=note,
+        mode="fingerprint",
     )
 
 

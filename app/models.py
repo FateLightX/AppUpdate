@@ -29,6 +29,9 @@ class NetdiskOut(BaseModel):
     title: str = ""
     url: str
     code: str = ""
+    mode: str = ""
+    mode_label: str = Field(default="", alias="modeLabel")
+    note: str = ""
 
 
 class SourceCreate(BaseModel):
@@ -83,6 +86,7 @@ class SettingsOut(BaseModel):
     telegram_configured: bool = Field(alias="telegramConfigured")
     has_token: bool = Field(alias="hasToken")
     has_panel_password: bool = Field(alias="hasPanelPassword")
+    telegram_detail: str = Field(default="compact", alias="telegramDetail")
 
     model_config = {"populate_by_name": True, "by_alias": True}
 
@@ -93,6 +97,7 @@ class SettingsUpdate(BaseModel):
     chat_id: Optional[str] = Field(default=None, alias="chatId")
     panel_password: Optional[str] = Field(default=None, alias="panelPassword")
     clear_panel_password: Optional[bool] = Field(default=None, alias="clearPanelPassword")
+    telegram_detail: Optional[str] = Field(default=None, alias="telegramDetail")
 
     model_config = {"populate_by_name": True}
 

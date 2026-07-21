@@ -21,6 +21,7 @@ def _public(settings: dict[str, Any]) -> dict[str, Any]:
         "hasToken": settings["hasToken"],
         "tokenMasked": ("••••" + settings["botToken"][-4:]) if settings.get("botToken") else "",
         "hasPanelPassword": bool(settings.get("hasPanelPassword")),
+        "telegramDetail": settings.get("telegramDetail") or "compact",
     }
 
 
@@ -51,11 +52,16 @@ async def put_settings(body: SettingsUpdate) -> dict[str, Any]:
             auth.revoke_all_sessions()
         # empty string without clear => ignore (do not change)
 
+    telegram_detail = data.get("telegram_detail")
+    if telegram_detail is not None:
+        telegram_detail = "full" if str(telegram_detail).strip().lower() == "full" else "compact"
+
     updated = db.update_settings(
         interval_hours=data.get("interval_hours"),
         bot_token=data.get("bot_token"),
         chat_id=data.get("chat_id"),
         panel_password_hash=panel_password_hash,
+        telegram_detail=telegram_detail,
     )
     reschedule_from_settings()
     return _public(updated)
@@ -66,5 +72,10 @@ async def test_telegram() -> dict[str, str]:
     settings = db.get_settings()
     if not settings["telegramConfigured"]:
         raise HTTPException(400, "请先填写 Bot Token 和 Chat ID")
-    await send_telegram(settings["botToken"], settings["chatId"], "【更新追踪】测试消息：连接正常。")
+    detail_label = "详细" if settings.get("telegramDetail") == "full" else "简洁"
+    await send_telegram(
+        settings["botToken"],
+        settings["chatId"],
+        "【更新追踪】测试消息：连接正常。\n当前推送：" + detail_label + "\n详情见面板",
+    )
     return {"ok": "true", "message": "测试消息已发送"}
