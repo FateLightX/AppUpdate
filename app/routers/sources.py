@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 
 from app import db
 from app.models import SourceCreate, SourceUpdate
-from app.services import article_svc, github_svc
+from app.services import article_svc, github_svc, netdisk_svc
 from app.services.match import ARCH_OPTIONS, EXT_OPTIONS, OS_OPTIONS, describe_rule, normalize_rule
 
 router = APIRouter(prefix="/api/sources", tags=["sources"])
@@ -14,7 +14,13 @@ router = APIRouter(prefix="/api/sources", tags=["sources"])
 
 def _public(source: dict[str, Any]) -> dict[str, Any]:
     data = {k: v for k, v in source.items() if k not in {"fingerprint", "createdAt", "updatedAt"}}
-    data["ruleText"] = describe_rule(source.get("filterRule") or {})
+    rule = source.get("filterRule") or {}
+    if source.get("type") == "netdisk":
+        data["ruleText"] = netdisk_svc.describe_netdisk_rule(rule)
+        data["shareCode"] = str(rule.get("code") or "")
+    else:
+        data["ruleText"] = describe_rule(rule)
+        data["shareCode"] = ""
     if not source.get("enabled"):
         data["status"] = "off"
     return data
@@ -61,6 +67,16 @@ def create(body: SourceCreate) -> dict[str, Any]:
             name = github_svc.default_name(url)
         filter_rule = normalize_rule(body.filter_rule.model_dump(by_alias=True) if body.filter_rule else {})
         include_prerelease = body.include_prerelease
+    elif body.type == "netdisk":
+        if not url.startswith("http://") and not url.startswith("https://"):
+            raise HTTPException(400, "网盘请填写完整 http(s) 分享链接")
+        if not netdisk_svc.is_netdisk_url(url):
+            raise HTTPException(400, "暂不支持该网盘，目前支持百度/阿里/夸克/123/天翼/蓝奏")
+        if not name:
+            name = netdisk_svc.default_name(url)
+        code = (body.share_code or "").strip() or netdisk_svc.extract_code(url)
+        filter_rule = {"code": code}
+        include_prerelease = True
     else:
         if not url.startswith("http://") and not url.startswith("https://"):
             raise HTTPException(400, "文章请填写完整 http(s) 链接")
@@ -99,12 +115,25 @@ def update(source_id: int, body: SourceUpdate) -> dict[str, Any]:
                 github_svc.parse_repo(url)
             except ValueError as e:
                 raise HTTPException(400, str(e)) from e
+        elif src["type"] == "netdisk":
+            if not url.startswith("http://") and not url.startswith("https://"):
+                raise HTTPException(400, "网盘请填写完整 http(s) 分享链接")
+            if not netdisk_svc.is_netdisk_url(url):
+                raise HTTPException(400, "暂不支持该网盘，目前支持百度/阿里/夸克/123/天翼/蓝奏")
         payload["url"] = url
     if "enabled" in data:
         payload["enabled"] = data["enabled"]
     if "include_prerelease" in data:
         payload["include_prerelease"] = data["include_prerelease"]
-    if "filter_rule" in data and data["filter_rule"] is not None:
+    if src["type"] == "netdisk" and ("share_code" in data or "url" in payload):
+        current_rule = src.get("filterRule") or {}
+        code = current_rule.get("code") or ""
+        if "share_code" in data and data["share_code"] is not None:
+            code = str(data["share_code"] or "").strip()
+        elif "url" in payload:
+            code = netdisk_svc.extract_code(payload["url"], str(code))
+        payload["filter_rule"] = {"code": code}
+    elif "filter_rule" in data and data["filter_rule"] is not None:
         payload["filter_rule"] = normalize_rule(
             body.filter_rule.model_dump(by_alias=True) if body.filter_rule else {}
         )

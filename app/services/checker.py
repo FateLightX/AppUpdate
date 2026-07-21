@@ -4,7 +4,7 @@ import logging
 from typing import Any, Optional
 
 from app import db
-from app.services import article_svc, github_svc
+from app.services import article_svc, github_svc, netdisk_svc
 from app.services.telegram_notify import format_update_message, send_telegram
 
 log = logging.getLogger("appupdate.checker")
@@ -36,6 +36,12 @@ async def check_one(source: dict[str, Any], *, notify: bool = True) -> dict[str,
                 source["url"],
                 include_prerelease=bool(source.get("includePrerelease", True)),
                 filter_rule=source.get("filterRule") or {},
+            )
+        elif source["type"] == "netdisk":
+            rule = source.get("filterRule") or {}
+            result = await netdisk_svc.fetch_share(
+                source["url"],
+                code=str(rule.get("code") or ""),
             )
         else:
             result = await article_svc.fetch_article(source["url"])

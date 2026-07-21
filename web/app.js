@@ -17,6 +17,16 @@ const state = {
 
 const $ = (id) => document.getElementById(id);
 
+function typeLabel(type) {
+  if (type === "github") return "GitHub";
+  if (type === "netdisk") return "网盘";
+  return "文章";
+}
+
+function tgMetaLabel() {
+  return state.settings?.telegramConfigured ? "TG 已开" : "TG 未配";
+}
+
 function toast(msg) {
   const el = $("toast");
   el.textContent = msg;
@@ -199,6 +209,7 @@ function filteredSources() {
     if (state.filter === "update") return s.hasUpdate || s.status === "update";
     if (state.filter === "github") return s.type === "github";
     if (state.filter === "article") return s.type === "article";
+    if (state.filter === "netdisk") return s.type === "netdisk";
     return true;
   });
 }
@@ -209,6 +220,7 @@ function renderFilters() {
     { id: "update", label: "有更新" },
     { id: "github", label: "GitHub" },
     { id: "article", label: "文章" },
+    { id: "netdisk", label: "网盘" },
   ];
   $("filters").innerHTML = items
     .map(
@@ -237,6 +249,21 @@ function metricFacts(item) {
         <div class="fact-main ${item.hasUpdate || item.status === "update" ? "warn" : ""}">${escapeHtml(version)}</div>
         <div class="fact-sub">${escapeHtml(matchText)}</div>
       </div>`;
+  }
+  if (item.type === "netdisk") {
+    const files = item.assets || [];
+    const title = item.title || item.version || "尚未检查";
+    const short = title.length > 28 ? `${title.slice(0, 28)}…` : title;
+    const sub = files.length
+      ? `${files.length} 个文件/文件夹`
+      : item.lastCheck
+        ? (item.summary || "已检查")
+        : "等待检查";
+    return `
+    <div class="facts">
+      <div class="fact-main ${item.hasUpdate || item.status === "update" ? "warn" : ""}" title="${escapeHtml(title)}">${escapeHtml(short)}</div>
+      <div class="fact-sub">${escapeHtml(sub)}</div>
+    </div>`;
   }
   const disks = item.netdisks || [];
   const providers = [...new Set(disks.map((d) => d.provider).filter(Boolean))];
@@ -281,7 +308,7 @@ function renderList() {
           <div class="name">${escapeHtml(item.name)}</div>
           <div class="sub">${escapeHtml(formatTime(item.lastCheck))} · ${escapeHtml(item.url)}</div>
         </div>
-        <div><span class="tag">${item.type === "github" ? "GitHub" : "文章"}</span></div>
+        <div><span class="tag">${typeLabel(item.type)}</span></div>
         <div>${metricFacts(item)}</div>
         <div class="${statusClass(item)}">${statusLabel(item)}</div>
         <div class="row-actions" data-stop>
@@ -354,6 +381,46 @@ function buildDetailHtml(item) {
         )
         .join("");
     }
+  } else if (item.type === "netdisk") {
+    const files = item.assets || [];
+    const disks = item.netdisks || [];
+    const d0 = disks[0] || {};
+    body += `
+      <div class="rule-box">
+        <div class="rule-title">分享信息</div>
+        <div class="rule-text">${escapeHtml(item.ruleText || "无提取码")}</div>
+        <div class="rule-hint">按分享内文件列表（或页面指纹）变化判断更新。</div>
+        <div style="margin-top:8px"><button type="button" class="link-btn" data-act="edit-detail" data-id="${item.id}">编辑</button></div>
+      </div>
+      <div class="section-label">分享标题</div><div>${escapeHtml(item.title || item.version || "-")}</div>
+      <div class="section-label">文件列表 ${files.length}</div>`;
+    if (!files.length) {
+      body += `<div class="empty" style="padding:16px 0">暂未列出文件（仍可按页面指纹监控）</div>`;
+    } else {
+      body += files
+        .map(
+          (a) => `
+        <div class="asset">
+          <code>${escapeHtml(a.name)}${a.size != null ? " · " + escapeHtml(String(a.size)) : ""}</code>
+          <div class="row-actions">
+            <a class="link-btn" href="${escapeHtml(a.url || item.url)}" target="_blank" rel="noopener">打开分享</a>
+          </div>
+        </div>`,
+        )
+        .join("");
+    }
+    body += `<div class="section-label">分享链接</div>`;
+    body += `
+      <div class="netdisk">
+        <div class="provider">${escapeHtml(d0.provider || "网盘")} · ${escapeHtml(d0.title || item.title || "")}</div>
+        <div class="meta">${d0.code ? "提取码 " + escapeHtml(d0.code) : "无提取码"}</div>
+        <div class="url-line">${escapeHtml(d0.url || item.url)}</div>
+        <div class="row-actions">
+          <button type="button" class="link-btn" data-copy="${escapeHtml(d0.url || item.url)}">复制链接</button>
+          ${d0.code ? `<button type="button" class="link-btn" data-copy="${escapeHtml(d0.code)}">复制提取码</button>` : ""}
+          <a class="link-btn" href="${escapeHtml(d0.url || item.url)}" target="_blank" rel="noopener">打开</a>
+        </div>
+      </div>`;
   } else {
     const disks = item.netdisks || [];
     body += `<div class="section-label">当前标题</div><div>${escapeHtml(item.title || item.version || "-")}</div>`;
@@ -383,23 +450,31 @@ function buildDetailHtml(item) {
     body += `<div class="section-label">最近错误</div><div class="status-err">${escapeHtml(item.lastError)}</div>`;
   }
 
+  const srcUrl = item.url || "";
+  const urlHtml = srcUrl
+    ? `<a class="url url-link" href="${escapeHtml(srcUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(srcUrl)}</a>`
+    : `<div class="url">-</div>`;
+
   return `
     <div class="detail">
       <div class="detail-head">
-        <div>
+        <div class="detail-title">
           <h3>${escapeHtml(item.name)}</h3>
-          <div class="url">${escapeHtml(item.url)}</div>
+          ${urlHtml}
         </div>
         <div class="detail-actions">
           <button type="button" class="switch ${item.enabled ? "on" : ""}" data-act="toggle" data-id="${item.id}" aria-label="启用停用"></button>
           <button type="button" class="icon-btn" data-act="close-detail" aria-label="关闭详情">×</button>
         </div>
       </div>
-      <div class="kv">
-        <span>类型</span><div>${item.type === "github" ? "GitHub" : "文章"}</div>
-        <span>状态</span><div class="${statusClass(item)}">${statusLabel(item)}</div>
-        <span>上次检查</span><div>${escapeHtml(formatTime(item.lastCheck))}</div>
-        <span>Telegram</span><div>${state.settings?.telegramConfigured ? "有更新时推送" : "未配置"}</div>
+      <div class="meta-strip" aria-label="检查信息">
+        <span class="meta-tag">${escapeHtml(typeLabel(item.type))}</span>
+        <span class="meta-dot" aria-hidden="true">·</span>
+        <span class="${statusClass(item)}">${escapeHtml(statusLabel(item))}</span>
+        <span class="meta-dot" aria-hidden="true">·</span>
+        <span class="meta-muted" title="上次检查">${escapeHtml(formatTime(item.lastCheck))}</span>
+        <span class="meta-dot" aria-hidden="true">·</span>
+        <span class="meta-muted" title="Telegram">${escapeHtml(tgMetaLabel())}</span>
       </div>
       ${body}
     </div>`;
@@ -495,8 +570,10 @@ function openEdit(id) {
   state.editId = id;
   $("editName").value = item.name || "";
   const isGh = item.type === "github";
+  const isNd = item.type === "netdisk";
   $("editGithubFields").style.display = isGh ? "block" : "none";
-  $("editArticleHint").hidden = isGh;
+  if ($("editNetdiskFields")) $("editNetdiskFields").hidden = !isNd;
+  $("editArticleHint").hidden = isGh || isNd;
   if (isGh) {
     const rule = item.filterRule || {};
     state.editExts = [...(rule.exts || [])];
@@ -506,6 +583,9 @@ function openEdit(id) {
     $("editExclude").value = (rule.exclude || []).join(", ");
     $("editPrerelease").checked = item.includePrerelease !== false;
     renderEditChips();
+  }
+  if (isNd && $("editShareCode")) {
+    $("editShareCode").value = item.shareCode || (item.filterRule && item.filterRule.code) || "";
   }
   $("editModal").classList.add("show");
 }
@@ -524,6 +604,8 @@ async function submitEdit() {
       include: parseKeywords($("editInclude").value),
       exclude: parseKeywords($("editExclude").value),
     };
+  } else if (item.type === "netdisk") {
+    body.shareCode = ($("editShareCode")?.value || "").trim();
   }
   try {
     await api(`/api/sources/${id}`, { method: "PATCH", body: JSON.stringify(body) });
@@ -550,6 +632,7 @@ function openAdd() {
   $("addInclude").value = "";
   $("addExclude").value = "";
   $("addPrerelease").checked = true;
+  if ($("addShareCode")) $("addShareCode").value = "";
   syncAddTypeUI();
   renderAddChips();
   $("addModal").classList.add("show");
@@ -560,11 +643,19 @@ function syncAddTypeUI() {
     btn.classList.toggle("on", btn.dataset.type === state.addType);
   });
   const gh = state.addType === "github";
+  const nd = state.addType === "netdisk";
   $("githubFields").style.display = gh ? "block" : "none";
-  $("urlLabel").textContent = gh ? "GitHub 仓库完整地址" : "文章完整链接";
-  $("addUrl").placeholder = gh
-    ? "https://github.com/owner/repo"
-    : "https://example.com/post/123";
+  if ($("netdiskFields")) $("netdiskFields").hidden = !nd;
+  if (gh) {
+    $("urlLabel").textContent = "GitHub 仓库完整地址";
+    $("addUrl").placeholder = "https://github.com/owner/repo";
+  } else if (nd) {
+    $("urlLabel").textContent = "网盘分享链接";
+    $("addUrl").placeholder = "https://pan.baidu.com/s/xxx 或阿里/夸克/123/天翼/蓝奏";
+  } else {
+    $("urlLabel").textContent = "文章完整链接";
+    $("addUrl").placeholder = "https://example.com/post/123";
+  }
 }
 
 async function submitAdd() {
@@ -585,6 +676,8 @@ async function submitAdd() {
       include: parseKeywords($("addInclude").value),
       exclude: parseKeywords($("addExclude").value),
     };
+  } else if (state.addType === "netdisk") {
+    body.shareCode = ($("addShareCode")?.value || "").trim();
   }
   try {
     const created = await api("/api/sources", { method: "POST", body: JSON.stringify(body) });

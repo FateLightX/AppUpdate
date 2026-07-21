@@ -63,6 +63,7 @@
       <div class="type-tabs">
         <button type="button" class="mini-chip on" data-type="github">GitHub</button>
         <button type="button" class="mini-chip" data-type="article">文章</button>
+        <button type="button" class="mini-chip" data-type="netdisk">网盘</button>
       </div>
       <div class="field">
         <label id="urlLabel">GitHub 仓库完整地址</label>
@@ -71,6 +72,13 @@
       <div class="field">
         <label>显示名称（可选）</label>
         <input id="addName" placeholder="留空则自动生成" />
+      </div>
+      <div id="netdiskFields" hidden>
+        <div class="field">
+          <label>提取码（可选）</label>
+          <input id="addShareCode" placeholder="没有可留空；链接里带 pwd= 也会自动识别" />
+          <div class="field-hint">直接监控分享页文件列表变化（百度/阿里/夸克/123/天翼/蓝奏）</div>
+        </div>
       </div>
       <div id="githubFields">
         <div class="field">
@@ -173,6 +181,12 @@
         </div>
         <div class="field">
           <label><input type="checkbox" id="editPrerelease" checked /> 包含预发布</label>
+        </div>
+      </div>
+      <div id="editNetdiskFields" hidden>
+        <div class="field">
+          <label>提取码（可选）</label>
+          <input id="editShareCode" placeholder="没有可留空" />
         </div>
       </div>
       <div class="field-hint" id="editArticleHint" hidden>文章类型仅可改名称；标题变化时会整页重抓网盘。</div>

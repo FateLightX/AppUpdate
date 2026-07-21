@@ -40,6 +40,22 @@ def format_update_message(source: dict[str, Any], result: dict[str, Any]) -> str
                 lines.append(f"… 另有 {len(assets) - 8} 个文件")
         else:
             lines.append("下载：暂无匹配文件")
+    elif source.get("type") == "netdisk":
+        lines.append(f"分享：{result.get('title') or '-'}")
+        assets = result.get("assets") or []
+        if assets:
+            lines.append("文件：")
+            for a in assets[:12]:
+                size = a.get("size")
+                size_s = f" ({size})" if size not in (None, "") else ""
+                lines.append(f"· {a.get('name')}{size_s}")
+            if len(assets) > 12:
+                lines.append(f"… 另有 {len(assets) - 12} 项")
+        disks = result.get("netdisks") or []
+        if disks:
+            d = disks[0]
+            code = f" 提取码 {d['code']}" if d.get("code") else ""
+            lines.append(f"链接：{d.get('url')}{code}")
     else:
         lines.append(f"标题：{result.get('title') or '-'}")
         disks = result.get("netdisks") or []

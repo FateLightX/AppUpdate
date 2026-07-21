@@ -5,7 +5,7 @@ from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 
 
-SourceType = Literal["github", "article"]
+SourceType = Literal["github", "article", "netdisk"]
 
 
 class FilterRule(BaseModel):
@@ -38,6 +38,7 @@ class SourceCreate(BaseModel):
     enabled: bool = True
     filter_rule: Optional[FilterRule] = Field(default=None, alias="filterRule")
     include_prerelease: bool = Field(default=True, alias="includePrerelease")
+    share_code: str = Field(default="", alias="shareCode")
 
     model_config = {"populate_by_name": True}
 
@@ -48,6 +49,7 @@ class SourceUpdate(BaseModel):
     url: Optional[str] = None
     filter_rule: Optional[FilterRule] = Field(default=None, alias="filterRule")
     include_prerelease: Optional[bool] = Field(default=None, alias="includePrerelease")
+    share_code: Optional[str] = Field(default=None, alias="shareCode")
 
     model_config = {"populate_by_name": True}
 
