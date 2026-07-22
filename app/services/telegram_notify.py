@@ -45,7 +45,7 @@ def format_update_message(
 ) -> str:
     """Build a scannable Telegram update notice.
 
-    compact: short lines, fewer items, no long download URL lists
+    compact: fewer items, with usable download URLs
     full: more items + URLs where useful
     """
     mode = _norm_detail(detail)
@@ -77,11 +77,11 @@ def _fmt_github(result: dict[str, Any], *, mode: TelegramDetail) -> list[str]:
         return lines
     for a in assets[:limit]:
         name = _clip(str(a.get("name") or "file"), 52)
-        if mode == "full" and a.get("url"):
-            lines.append(f"· {name}")
+        lines.append(f"· {name}")
+        if a.get("url"):
+            # A file name alone is not actionable in Telegram. Keep compact mode
+            # compact by limiting the asset count, not by dropping its link.
             lines.append(f"  {a['url']}")
-        else:
-            lines.append(f"· {name}")
     rest = len(assets) - limit
     if rest > 0:
         lines.append(f"… 另有 {rest} 个，见面板")
