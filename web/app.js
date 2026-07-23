@@ -297,15 +297,26 @@ function parseKeywords(text) {
     .filter(Boolean);
 }
 
+function hasPendingUpdate(s) {
+  return !!(s.hasUpdate || s.status === "update");
+}
+
 function filteredSources() {
-  return state.sources.filter((s) => {
-    if (state.filter === "all") return true;
-    if (state.filter === "update") return s.hasUpdate || s.status === "update";
-    if (state.filter === "github") return s.type === "github";
-    if (state.filter === "article") return s.type === "article";
-    if (state.filter === "netdisk") return s.type === "netdisk";
-    return true;
-  });
+  return state.sources
+    .filter((s) => {
+      if (state.filter === "all") return true;
+      if (state.filter === "update") return hasPendingUpdate(s);
+      if (state.filter === "github") return s.type === "github";
+      if (state.filter === "article") return s.type === "article";
+      if (state.filter === "netdisk") return s.type === "netdisk";
+      return true;
+    })
+    .sort((a, b) => {
+      const au = hasPendingUpdate(a) ? 0 : 1;
+      const bu = hasPendingUpdate(b) ? 0 : 1;
+      if (au !== bu) return au - bu;
+      return (b.id || 0) - (a.id || 0);
+    });
 }
 
 function renderEmptyState() {

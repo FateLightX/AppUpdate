@@ -232,7 +232,14 @@ def delete_all_sessions() -> None:
 
 def list_sources() -> list[dict[str, Any]]:
     with connect() as conn:
-        rows = conn.execute("SELECT * FROM sources ORDER BY id DESC").fetchall()
+        rows = conn.execute(
+            """
+            SELECT * FROM sources
+            ORDER BY
+              CASE WHEN has_update = 1 OR status = 'update' THEN 0 ELSE 1 END,
+              id DESC
+            """
+        ).fetchall()
         return [row_to_source(r) for r in rows]
 
 
